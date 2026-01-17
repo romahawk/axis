@@ -43,3 +43,33 @@ def today_view():
             {"id": "b1", "text": "None (baseline stable)"},
         ],
     }
+
+@app.get("/api/v1/views/week")
+def week_view(week: str | None = None):
+    # MVP v0: hardcoded payload
+    # week format: "YYYY-Www" (optional). If omitted, return a placeholder current-week value.
+    current_week = date.today().isocalendar()
+    default_week = f"{current_week.year}-W{current_week.week:02d}"
+
+    return {
+        "week": week or default_week,
+        "focus": [
+            {"id": "f1", "text": "Use Axis daily (Today + Week)"},
+            {"id": "f2", "text": "Ship Week view v0"},
+        ],
+        "commitments": [
+            {
+                "id": "c1",
+                "text": "Plan Sprint 1 tasks",
+                "domain": "product",
+                "status": "doing",
+                "trello": {"url": "https://trello.com/"},
+            },
+            {"id": "c2", "text": "2 gym sessions", "domain": "health", "status": "planned"},
+        ],
+        "constraints": [
+            {"id": "k1", "text": "German lesson — Mon 18:15"},
+            {"id": "k2", "text": "Basketball — Fri 20:30"},
+        ],
+        "notes": "Keep load realistic; no new side quests.",
+    }
