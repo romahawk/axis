@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, Link } from "react-router-dom";
 import TodayPage from "./pages/TodayPage";
 import WeekPage from "./pages/WeekPage";
+import InboxPage from "./pages/InboxPage";
 import { useMe } from "./hooks/useMe";
 
 export default function App() {
@@ -20,6 +21,9 @@ export default function App() {
               <Link to="/week" className="text-slate-300 hover:text-white">
                 Week
               </Link>
+              <Link to="/inbox" className="text-slate-300 hover:text-white">
+                Inbox
+              </Link>
             </nav>
 
             <div className="text-xs text-slate-400">
@@ -36,6 +40,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/week" element={<WeekPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
         </Routes>
       </main>
     </div>

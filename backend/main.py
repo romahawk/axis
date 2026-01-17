@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import date
+from datetime import date, datetime, timezone
 
 app = FastAPI(title="Axis API")
 
@@ -72,4 +72,31 @@ def week_view(week: str | None = None):
             {"id": "k2", "text": "Basketball — Fri 20:30"},
         ],
         "notes": "Keep load realistic; no new side quests.",
+    }
+
+@app.get("/api/v1/views/inbox")
+def inbox_view():
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "items": [
+            {
+                "id": "i1",
+                "text": "Idea: add toggles + persistence for Today",
+                "created_at": now,
+                "source": "manual",
+            },
+            {
+                "id": "i2",
+                "text": "Follow up: finalize Week payload and UI polish",
+                "created_at": now,
+                "source": "manual",
+            },
+            {
+                "id": "i3",
+                "text": "Note: keep Axis manual-first for 2 weeks before automation",
+                "created_at": now,
+                "source": "manual",
+                "link": {"url": "https://trello.com/", "title": "Trello reference"},
+            },
+        ]
     }
