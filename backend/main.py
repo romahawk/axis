@@ -211,3 +211,15 @@ def inbox_create(payload: InboxCreate):
 
     INBOX_ITEMS.append(item)
     return item
+
+@app.delete("/api/v1/views/inbox/{item_id}")
+def inbox_delete(item_id: str):
+    global INBOX_ITEMS
+    before = len(INBOX_ITEMS)
+    INBOX_ITEMS = [it for it in INBOX_ITEMS if it.get("id") != item_id]
+    after = len(INBOX_ITEMS)
+
+    if after == before:
+        return {"error": "item not found"}
+
+    return {"ok": True, "deleted": item_id}
