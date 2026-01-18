@@ -1,8 +1,10 @@
 import CheckList from "../components/CheckList";
 import { useTodayView } from "../hooks/useTodayView";
+import { useToggleTodayItem } from "../hooks/useToggleTodayItem";
 
 export default function TodayPage() {
   const { data, isLoading, isError, error } = useTodayView();
+  const toggle = useToggleTodayItem();
 
   if (isLoading) {
     return (
@@ -32,14 +34,25 @@ export default function TodayPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <CheckList title="Outcomes (max 3)" items={data?.outcomes ?? []} />
-        <CheckList title="Actions" items={data?.actions ?? []} />
+        <CheckList
+          title="Outcomes (max 3)"
+          items={data?.outcomes ?? []}
+          onToggle={(id, nextDone) =>
+            toggle.mutate({ kind: "outcomes", id, done: nextDone })
+          }
+        />
+
+        <CheckList
+          title="Actions"
+          items={data?.actions ?? []}
+          onToggle={(id, nextDone) =>
+            toggle.mutate({ kind: "actions", id, done: nextDone })
+          }
+        />
       </div>
 
       <div className="rounded-xl border border-slate-800 p-4">
-        <div className="mb-3 text-sm font-semibold text-slate-200">
-          Blockers
-        </div>
+        <div className="mb-3 text-sm font-semibold text-slate-200">Blockers</div>
         {data?.blockers?.length ? (
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-200">
             {data.blockers.map((b) => (
