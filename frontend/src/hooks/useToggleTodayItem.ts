@@ -1,40 +1,38 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { patchJSON } from "../lib/api";
-import type { TodayView } from "./useTodayView";
 
-type Kind = "outcomes" | "actions";
+type TogglePayload = {
+  kind: "outcomes" | "actions";
+  id: string;
+  done: boolean;
+};
+
+type TodayItem = {
+  id: string;
+  text: string;
+  done?: boolean;
+};
 
 export function useToggleTodayItem() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (args: { kind: Kind; id: string; done: boolean }) => {
-      return patchJSON(`/api/v1/views/today/${args.kind}/${args.id}`, {
-        done: args.done,
+    mutationFn: async ({ kind, id, done }: TogglePayload): Promise<TodayItem> => {
+      const res = await fetch(`/api/v1/views/today/${kind}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done }),
       });
-    },
 
-    onMutate: async ({ kind, id, done }) => {
-      await qc.cancelQueries({ queryKey: ["todayView"] });
-
-      const prev = qc.getQueryData<TodayView>(["todayView"]);
-
-      if (prev) {
-        qc.setQueryData<TodayView>(["todayView"], {
-          ...prev,
-          [kind]: prev[kind].map((it) => (it.id === id ? { ...it, done } : it)),
-        });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Toggle failed: ${res.status} ${txt}`);
       }
 
-      return { prev };
+      return res.json();
     },
-
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["todayView"], ctx.prev);
-    },
-
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["todayView"] });
+    onSuccess: async () => {
+      // Dashboard reads Today Top 3 → refresh it
+      await qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
