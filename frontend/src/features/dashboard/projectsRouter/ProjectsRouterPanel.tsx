@@ -1,6 +1,15 @@
 // frontend/src/features/dashboard/projectsRouter/ProjectsRouterPanel.tsx
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  X,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 
 import { Panel } from "../../../components/Panel";
 import { useProjectsRouter } from "./useProjectsRouter";
@@ -39,14 +48,13 @@ export function ProjectsRouterPanel(props: {
     putJSON: props.putJSON,
   });
 
-  // Sprint 3: routing first.
-  // - Active projects are expanded by default.
-  // - Inactive projects are visually de-emphasized.
+  // Active projects expanded by default; preserve manual expansions.
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set());
 
-  // Ensure active projects are expanded by default (without removing user's manual expansions).
   React.useEffect(() => {
-    const activeKeys = new Set(sortedProjects.filter((p) => p.is_active).map((p) => p.key));
+    const activeKeys = new Set(
+      sortedProjects.filter((p) => p.is_active).map((p) => p.key)
+    );
     setExpanded((prev) => new Set([...activeKeys, ...prev]));
   }, [sortedProjects]);
 
@@ -60,20 +68,25 @@ export function ProjectsRouterPanel(props: {
   }
 
   return (
-    <Panel title="Projects (router)" className="bg-slate-950/40 border-slate-800/80">
-      {/* Speed controls (kept, but visually secondary) */}
+    <Panel
+      title="Projects (router)"
+      className="border-0 bg-transparent p-0 shadow-none"
+    >
+      {/* Speed controls */}
       <div className="mb-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-xs text-slate-400">
             Active: <span className="text-slate-200">{activeCount}</span>/3
           </div>
+
           <button
-            className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
             onClick={addNewProject}
             disabled={projectSaving}
             title="Add new project"
           >
-            + Add
+            <Plus className="h-3.5 w-3.5" />
+            Add Project
           </button>
         </div>
 
@@ -105,7 +118,7 @@ export function ProjectsRouterPanel(props: {
         )}
       </div>
 
-      {/* Projects routing list */}
+      {/* Projects list */}
       <ul className="space-y-2">
         {sortedProjects.map((p) => {
           const isEditing = editingProjectKey === p.key;
@@ -123,7 +136,7 @@ export function ProjectsRouterPanel(props: {
                 !isActive ? "opacity-60" : "opacity-100",
               ].join(" ")}
             >
-              {/* Header row (toggle expand) */}
+              {/* Header row */}
               <div className="flex items-start justify-between gap-2 p-3">
                 <button
                   type="button"
@@ -132,9 +145,11 @@ export function ProjectsRouterPanel(props: {
                   aria-expanded={isExpanded}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500" aria-hidden>
-                      {isExpanded ? "▾" : "▸"}
-                    </span>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-slate-500" />
+                    )}
 
                     <div className="truncate font-semibold text-slate-100">
                       {isEditing ? (
@@ -144,7 +159,9 @@ export function ProjectsRouterPanel(props: {
                           value={projectDraft?.name ?? ""}
                           placeholder="Project name"
                           onChange={(e) =>
-                            setProjectDraft((d) => (d ? { ...d, name: e.target.value } : d))
+                            setProjectDraft((d) =>
+                              d ? { ...d, name: e.target.value } : d
+                            )
                           }
                         />
                       ) : (
@@ -156,7 +173,7 @@ export function ProjectsRouterPanel(props: {
                   <div className="mt-1 text-xs text-slate-500">{p.key}</div>
                 </button>
 
-                {/* Right-side actions */}
+                {/* Actions */}
                 {!isEditing ? (
                   <div className="flex flex-col items-end gap-2">
                     <button
@@ -175,16 +192,16 @@ export function ProjectsRouterPanel(props: {
 
                     <div className="flex gap-2">
                       <button
-                        className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                         onClick={() => startEditProject(p)}
                         disabled={projectSaving}
                         title="Edit project"
                       >
-                        Edit
+                        <Pencil className="h-3.5 w-3.5" />
                       </button>
 
                       <button
-                        className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                         onClick={() => {
                           const ok = window.confirm(`Delete project "${p.name}"?`);
                           if (!ok) return;
@@ -193,7 +210,7 @@ export function ProjectsRouterPanel(props: {
                         disabled={projectSaving}
                         title="Delete project"
                       >
-                        Del
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -206,6 +223,7 @@ export function ProjectsRouterPanel(props: {
                     >
                       Cancel
                     </button>
+
                     <button
                       className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                       onClick={saveProjectDraft}
@@ -217,7 +235,7 @@ export function ProjectsRouterPanel(props: {
                 )}
               </div>
 
-              {/* Links / Routing */}
+              {/* Expanded content */}
               {isExpanded ? (
                 <div className="px-3 pb-3">
                   {!isEditing ? (
@@ -233,12 +251,7 @@ export function ProjectsRouterPanel(props: {
                             title={`${p.name} • ${l.label}`}
                           >
                             <span className="truncate">{l.label}</span>
-                            <span
-                              className="ml-2 text-slate-500 group-hover:text-slate-300"
-                              aria-hidden
-                            >
-                              ↗
-                            </span>
+                            <ExternalLink className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100" />
                           </a>
                         ))
                       ) : (
@@ -262,7 +275,10 @@ export function ProjectsRouterPanel(props: {
                               setProjectDraft((d) => {
                                 if (!d) return d;
                                 const links = [...d.links];
-                                links[idx] = { ...links[idx], label: e.target.value };
+                                links[idx] = {
+                                  ...links[idx],
+                                  label: e.target.value,
+                                };
                                 return { ...d, links };
                               })
                             }
@@ -283,7 +299,7 @@ export function ProjectsRouterPanel(props: {
                           />
 
                           <button
-                            className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                            className="inline-flex items-center justify-center rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                             onClick={() =>
                               setProjectDraft((d) => {
                                 if (!d) return d;
@@ -292,23 +308,28 @@ export function ProjectsRouterPanel(props: {
                               })
                             }
                             type="button"
+                            title="Remove link"
                           >
-                            ✕
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
 
                       <button
-                        className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                         onClick={() =>
                           setProjectDraft((d) => {
                             if (!d) return d;
-                            return { ...d, links: [...d.links, { label: "", url: "" }] };
+                            return {
+                              ...d,
+                              links: [...d.links, { label: "", url: "" }],
+                            };
                           })
                         }
                         type="button"
                       >
-                        + Add link
+                        <Plus className="h-3.5 w-3.5" />
+                        Add link
                       </button>
                     </div>
                   )}

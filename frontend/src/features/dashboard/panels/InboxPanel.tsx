@@ -2,6 +2,7 @@
 import * as React from "react";
 import { Panel } from "../../../components/Panel";
 import { useLocalStorageJson } from "../../../hooks/useLocalStorageJson";
+import { ChevronUp, ChevronDown, Plus, Trash2 } from "lucide-react";
 
 type InboxItem = {
   id: string;
@@ -25,7 +26,6 @@ function normalizeText(raw: string) {
 
 export function InboxPanel(props: {
   onSendToToday: (text: string) => Promise<void> | void;
-  
 }) {
   const [items, setItems] = useLocalStorageJson<InboxItem[]>(STORAGE_KEY, []);
   const [isOpen, setIsOpen] = useLocalStorageJson<boolean>(OPEN_KEY, true);
@@ -55,15 +55,14 @@ export function InboxPanel(props: {
     setItems((prev) => (prev ?? []).filter((x) => x.id !== id));
   }
 
-  async function send(id: string, target: "today" | "week") {
+  async function sendToToday(id: string) {
     const it = (items ?? []).find((x) => x.id === id);
     if (!it) return;
     if (busyId) return;
 
     setBusyId(id);
     try {
-      if (target === "today") await props.onSendToToday(it.text);
-      else 
+      await props.onSendToToday(it.text);
       // Buffer behavior: remove after successful send.
       removeItem(id);
     } finally {
@@ -78,13 +77,23 @@ export function InboxPanel(props: {
           <div className="text-xs text-slate-500">
             Buffer: capture now, decide later.
           </div>
+
           <button
             type="button"
-            className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
           >
-            {isOpen ? "Hide" : `Show (${(items ?? []).length})`}
+            {isOpen ? (
+              <>
+                Hide <ChevronUp className="h-3.5 w-3.5 opacity-80" />
+              </>
+            ) : (
+              <>
+                Show ({(items ?? []).length}){" "}
+                <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+              </>
+            )}
           </button>
         </div>
 
@@ -120,20 +129,22 @@ export function InboxPanel(props: {
 
                   <div className="mt-3 flex items-center gap-2">
                     <button
-                      className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:opacity-50"
-                      onClick={() => send(it.id, "today")}
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:opacity-50"
+                      onClick={() => sendToToday(it.id)}
                       disabled={busyId === it.id}
                       title="Send to Today"
                     >
-                      ➕ Today
+                      <Plus className="h-3.5 w-3.5" />
+                      Today
                     </button>
+
                     <button
-                      className="ml-auto rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:opacity-50"
+                      className="ml-auto inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:opacity-50"
                       onClick={() => removeItem(it.id)}
                       disabled={busyId === it.id}
                       title="Dismiss"
                     >
-                      🗑️
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>

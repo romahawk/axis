@@ -1,6 +1,7 @@
 // frontend/src/features/dashboard/panels/NowPanel.tsx
 import * as React from "react";
 import { Panel } from "../../../components/Panel";
+import { ExternalLink, Clock } from "lucide-react";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -46,7 +47,10 @@ export function NowPanel() {
   return (
     <Panel title="NOW">
       <div className="space-y-2">
-        <div className="text-sm text-slate-200">{formatNow(now)}</div>
+        <div className="flex items-center gap-2 text-sm text-slate-200">
+          <Clock className="h-4 w-4 text-slate-400" />
+          <span>{formatNow(now)}</span>
+        </div>
         <a
           href={calendarUrl}
           target="_blank"
@@ -54,7 +58,7 @@ export function NowPanel() {
           className="inline-flex items-center gap-2 text-xs text-slate-300 underline hover:text-white"
         >
           Open Google Calendar
-          <span aria-hidden>↗</span>
+          <ExternalLink className="h-3.5 w-3.5 opacity-70" aria-hidden />
         </a>
       </div>
     </Panel>

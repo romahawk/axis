@@ -1,8 +1,6 @@
 // frontend/src/pages/DashboardPage.tsx
 import { useQueryClient } from "@tanstack/react-query";
-
-import { WeeklyResourceDock } from "../features/dashboard/resources/WeeklyResourceDock";
-
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { Panel } from "../components/Panel";
 import { NowPanel } from "../features/dashboard/panels/NowPanel";
@@ -10,9 +8,12 @@ import { InboxPanel } from "../features/dashboard/panels/InboxPanel";
 
 import { useDashboardView } from "../hooks/useDashboardView";
 import { useToggleTodayItem } from "../hooks/useToggleTodayItem";
+import { useLocalStorageJson } from "../hooks/useLocalStorageJson";
 
 import { putJSON } from "../features/dashboard/api/putJSON";
 import { ResourcesPanel } from "../features/dashboard/resources/ResourcesPanel";
+import { WeeklyResourceDock } from "../features/dashboard/resources/WeeklyResourceDock";
+
 import type { Link, ResourceSection } from "../features/dashboard/types";
 
 import { WeekOutcomesPanel } from "../features/dashboard/weekOutcomes/WeekOutcomesPanel";
@@ -20,7 +21,6 @@ import { WeekBlockersPanel } from "../features/dashboard/blockers/WeekBlockersPa
 import { TodayTop3Panel } from "../features/dashboard/todayTop3/TodayTop3Panel";
 import { ProjectsRouterPanel } from "../features/dashboard/projectsRouter/ProjectsRouterPanel";
 
-// Minimal fetch helper (kept local to avoid dependency assumptions)
 type Project = { key: string; name: string; is_active?: boolean; links: Link[] };
 
 type WeekOutcome = { id: string; text: string };
@@ -31,6 +31,11 @@ export default function DashboardPage() {
   const { data, isLoading, isError, error } = useDashboardView();
   const toggleToday = useToggleTodayItem();
   const qc = useQueryClient();
+
+  const [leftCollapsed, setLeftCollapsed] = useLocalStorageJson<boolean>(
+    "axis_left_collapsed_v1",
+    false
+  );
 
   if (isLoading) return <div className="text-slate-400">Loading…</div>;
 
@@ -51,11 +56,8 @@ export default function DashboardPage() {
   const weekBlockers = (data.week.blockers ?? []) as WeekBlocker[];
   const todayTop3 = (data.today.top3 ?? []) as TodayTop3Item[];
 
-  // -----------------------------
-  // Inbox -> Today/Week routing (no new backend)
-  // Today: fill first empty slot in Today Top 3, else replace slot 3.
-  // Week: fill first empty slot in Week Blockers (as minimal Week buffer), else replace slot 3.
-  // -----------------------------
+  // Inbox -> Today routing (no backend changes beyond existing endpoint)
+  // Fills first empty slot in Today Top 3, else replaces slot 3.
   async function sendToToday(text: string) {
     const cleaned = (text ?? "").trim();
     if (!cleaned) return;
@@ -71,20 +73,56 @@ export default function DashboardPage() {
     await qc.invalidateQueries({ queryKey: ["dashboard"] });
   }
 
-  // -----------------------------
-  // Layout (full-screen, scrollable columns)
-  // -----------------------------
   return (
-    <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[320px_1fr_360px]">
-      {/* LEFT — Weekly dock + Projects router */}
+    <div
+      className="grid h-full grid-cols-1 gap-4"
+      style={{
+        gridTemplateColumns: leftCollapsed ? "72px 1fr 360px" : "320px 1fr 360px",
+      }}
+    >
+      {/* LEFT — Dock (collapsible) */}
       <aside className="h-full overflow-y-auto pr-1">
-        <div className="space-y-4">
-          <WeeklyResourceDock resources={resources} />
-          <ProjectsRouterPanel projects={projects} putJSON={putJSON} />
+        <div
+          className={[
+            "relative rounded-2xl p-3",
+            "bg-gradient-to-b from-slate-950/70 to-slate-950/40",
+            "border border-slate-800/60",
+            "shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset]",
+          ].join(" ")}
+        >
+          {/* Collapse toggle */}
+          <button
+            type="button"
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className="absolute right-2 top-2 inline-flex items-center justify-center rounded-md border border-slate-800/70 bg-slate-950/40 p-1.5 text-slate-300 hover:text-white"
+            title={leftCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={leftCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {leftCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
+
+          {/* Content */}
+          {!leftCollapsed ? (
+            <div className="space-y-4 pt-8">
+              <WeeklyResourceDock resources={resources} />
+              <div className="h-px bg-slate-800/60" />
+              <ProjectsRouterPanel projects={projects} putJSON={putJSON} />
+            </div>
+          ) : (
+            <div className="pt-8">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500">
+                Dock
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* CENTER — Weekly Execution Spine (scrollable) */}
+      {/* CENTER — Weekly Execution Spine */}
       <main className="h-full overflow-y-auto pr-1">
         <div className="space-y-4">
           <div className="flex items-baseline justify-between">
@@ -95,10 +133,8 @@ export default function DashboardPage() {
             <div className="text-xs text-slate-400">MODE: {data.week.mode}</div>
           </div>
 
-          {/* Top 3 Outcomes (editable) */}
           <WeekOutcomesPanel weekOutcomes={weekOutcomes} putJSON={putJSON} />
 
-          {/* Active Projects */}
           <Panel title="Active Projects (max 3)">
             {data.week.active_projects.length ? (
               <ul className="space-y-2 text-sm">
@@ -109,9 +145,7 @@ export default function DashboardPage() {
                   >
                     <div className="text-slate-100">{p.key ?? "Project"}</div>
                     {p.focus && (
-                      <div className="mt-1 text-xs text-slate-400">
-                        {p.focus}
-                      </div>
+                      <div className="mt-1 text-xs text-slate-400">{p.focus}</div>
                     )}
                     {p.url && (
                       <a
@@ -133,7 +167,6 @@ export default function DashboardPage() {
             )}
           </Panel>
 
-          {/* Today — Top 3 (editable + toggle) */}
           <TodayTop3Panel
             date={data.today.date}
             todayTop3={todayTop3}
@@ -141,15 +174,13 @@ export default function DashboardPage() {
             toggleToday={toggleToday}
           />
 
-          {/* Blockers / Risks (editable) */}
           <WeekBlockersPanel weekBlockers={weekBlockers} putJSON={putJSON} />
 
-          {/* Resources (this week) */}
           <ResourcesPanel resources={resources} />
         </div>
       </main>
 
-      {/* RIGHT — Time + Inbox + (existing) Anchors & Drift */}
+      {/* RIGHT — Time + Inbox */}
       <aside className="h-full overflow-y-auto pr-1">
         <div className="space-y-4">
           <NowPanel />
