@@ -2,11 +2,11 @@
 const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 const isProd = import.meta.env.PROD;
 
-// In production, do NOT fallback to localhost.
-// If the env var is missing, fail loudly so the issue is obvious.
+// In production, never fallback to localhost.
+// Fail loudly so you immediately know env is misconfigured.
 if (isProd && !raw) {
   throw new Error(
-    "VITE_API_BASE_URL is missing in production. Set it in Vercel and redeploy."
+    "VITE_API_BASE_URL is missing in production. Set it in Vercel and redeploy (clear cache)."
   );
 }
 
