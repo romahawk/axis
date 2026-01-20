@@ -39,3 +39,46 @@
   pointer-events: none;
   opacity: 0.18;
 }
+
+/* Axis section tones — subtle, consistent, sci-fi */
+.axis-tone {
+  border: 1px solid rgba(148, 163, 184, 0.14); /* slate-400/14 */
+  background: rgba(2, 6, 23, 0.30);            /* slate-950/30 */
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.06) inset;
+}
+
+.axis-tone-week {
+  background:
+    linear-gradient(180deg,
+      rgba(34, 211, 238, 0.08),
+      rgba(2, 6, 23, 0.22) 55%,
+      rgba(2, 6, 23, 0.30));
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.10) inset;
+}
+
+.axis-tone-focus {
+  background:
+    linear-gradient(180deg,
+      rgba(99, 102, 241, 0.10),
+      rgba(2, 6, 23, 0.22) 55%,
+      rgba(2, 6, 23, 0.30));
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12) inset;
+}
+
+.axis-tone-today {
+  background:
+    linear-gradient(180deg,
+      rgba(16, 185, 129, 0.10),
+      rgba(2, 6, 23, 0.22) 55%,
+      rgba(2, 6, 23, 0.30));
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.12) inset;
+}
+
+.axis-tone-risk {
+  background:
+    linear-gradient(180deg,
+      rgba(244, 63, 94, 0.10),
+      rgba(2, 6, 23, 0.22) 55%,
+      rgba(2, 6, 23, 0.30));
+  box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.12) inset;
+}

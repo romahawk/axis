@@ -49,7 +49,7 @@ export function WeekOutcomesPanel(props: {
   return (
     <Panel
       title="Top 3 Outcomes (weekly)"
-      className={isWeekSet ? "border-emerald-900/60 bg-emerald-950/10" : ""}
+      className={`axis-tone axis-tone-week ${isWeekSet ? "border-emerald-900/30" : ""}`}
     >
       {/* Header / progress */}
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -63,9 +63,7 @@ export function WeekOutcomesPanel(props: {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <div className="text-xs text-slate-400">
-              {setCount} / 3 set
-            </div>
+            <div className="text-xs text-slate-400">{setCount} / 3 set</div>
 
             {isWeekSet ? (
               <span className="rounded-full border border-emerald-900/60 bg-emerald-950/30 px-2 py-0.5 text-xs text-emerald-200">
@@ -136,7 +134,8 @@ export function WeekOutcomesPanel(props: {
 
           {isWeekSet && (
             <div className="pt-1 text-xs text-slate-500">
-              Execution happens via <span className="text-slate-300">Today</span>.
+              Execution happens via{" "}
+              <span className="text-slate-300">Today</span>.
             </div>
           )}
         </div>

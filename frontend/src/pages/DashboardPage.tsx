@@ -130,12 +130,11 @@ export default function DashboardPage() {
               <div className="text-xs text-slate-400">THIS WEEK</div>
               <div className="text-xl font-semibold">{data.week.week_id}</div>
             </div>
-            <div className="text-xs text-slate-400">MODE: {data.week.mode}</div>
           </div>
 
           <WeekOutcomesPanel weekOutcomes={weekOutcomes} putJSON={putJSON} />
 
-          <Panel title="Active Projects (max 3)">
+          <Panel title="Active Projects (max 3)" className="axis-tone axis-tone-focus">
             {data.week.active_projects.length ? (
               <ul className="space-y-2 text-sm">
                 {data.week.active_projects.slice(0, 3).map((p: any) => (

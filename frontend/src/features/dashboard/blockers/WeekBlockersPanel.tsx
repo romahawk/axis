@@ -28,7 +28,7 @@ export function WeekBlockersPanel(props: {
   });
 
   return (
-    <Panel title="Blockers / Risks (max 3)">
+    <Panel title="Blockers / Risks (max 3)" className="axis-tone axis-tone-risk">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-xs text-slate-500">Rule: max 3 (slots).</div>
 

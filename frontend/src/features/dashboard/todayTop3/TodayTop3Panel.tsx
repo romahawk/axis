@@ -79,7 +79,7 @@ export function TodayTop3Panel(props: {
   return (
     <Panel
       title={`Today — Top 3 (${props.date})`}
-      className={isCompleted ? "border-emerald-900/60 bg-emerald-950/10" : ""}
+      className={`axis-tone axis-tone-today ${isCompleted ? "border-emerald-900/60" : ""}`}
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3">
