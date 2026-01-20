@@ -15,7 +15,11 @@ app = FastAPI(title="Axis API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+    "http://localhost:5173",
+    "https://axis-personal.vercel.app",
+    "https://axis-dev.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
