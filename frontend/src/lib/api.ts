@@ -1,38 +1,50 @@
-// frontend/src/lib/api.ts
-// Central API helpers for Axis.
-// MUST NOT hardcode localhost in production.
+import { toApiUrl } from "../config/api";
 
-import { API_BASE_URL } from "../config/api";
+export async function fetchJSON<T>(pathOrUrl: string): Promise<T> {
+  const url = toApiUrl(pathOrUrl);
 
-export const API_BASE = API_BASE_URL;
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET ${url} -> HTTP ${res.status}`);
 
-export function toApiUrl(pathOrUrl: string) {
-  // Absolute URL → keep as-is
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-
-  // Relative path → prefix with API base
-  const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
-  return `${API_BASE}${path}`;
+  return res.json() as Promise<T>;
 }
 
-export async function fetchJSON<T>(
-  pathOrUrl: string,
-  init?: RequestInit
-): Promise<T> {
+export async function postJSON<T>(pathOrUrl: string, body: unknown): Promise<T> {
   const url = toApiUrl(pathOrUrl);
 
   const res = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`GET ${url} failed: ${res.status} ${txt}`);
-  }
+  if (!res.ok) throw new Error(`POST ${url} -> HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
 
-  return (await res.json()) as T;
+export async function patchJSON<T>(pathOrUrl: string, body: unknown): Promise<T> {
+  const url = toApiUrl(pathOrUrl);
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`PATCH ${url} -> HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+export async function deleteJSON<T>(pathOrUrl: string): Promise<T> {
+  const url = toApiUrl(pathOrUrl);
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!res.ok) throw new Error(`DELETE ${url} -> HTTP ${res.status}`);
+  return res.json() as Promise<T>;
 }

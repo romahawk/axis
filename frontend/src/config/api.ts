@@ -1,14 +1,20 @@
 // frontend/src/config/api.ts
-const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-const isProd = import.meta.env.PROD;
 
-// In production, never fallback to localhost.
-// Fail loudly so you immediately know env is misconfigured.
-if (isProd && !raw) {
+const raw = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const cleaned = raw?.trim();
+
+export const API_BASE_URL =
+  cleaned || (import.meta.env.DEV ? "http://localhost:8000" : "");
+
+// Fail fast in production builds (prevents silently baking localhost again)
+if (import.meta.env.PROD && !API_BASE_URL) {
   throw new Error(
-    "VITE_API_BASE_URL is missing in production. Set it in Vercel and redeploy (clear cache)."
+    "Missing VITE_API_BASE_URL in production build. Set it in Vercel -> Environment Variables (Production)."
   );
 }
 
-// In dev, allow localhost fallback.
-export const API_BASE_URL = raw || "http://localhost:8000";
+export function toApiUrl(pathOrUrl: string) {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${API_BASE_URL}${path}`;
+}
