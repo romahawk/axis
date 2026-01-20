@@ -137,3 +137,5 @@ dist
 
 # Backend
 backend/data/*.json
+__pycache__/
+*.pyc
