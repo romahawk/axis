@@ -1,6 +1,9 @@
 // frontend/src/pages/DashboardPage.tsx
 import { useQueryClient } from "@tanstack/react-query";
 
+import { WeeklyResourceDock } from "../features/dashboard/resources/WeeklyResourceDock";
+
+
 import { Panel } from "../components/Panel";
 import { NowPanel } from "../features/dashboard/panels/NowPanel";
 import { InboxPanel } from "../features/dashboard/panels/InboxPanel";
@@ -73,9 +76,12 @@ export default function DashboardPage() {
   // -----------------------------
   return (
     <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[320px_1fr_360px]">
-      {/* LEFT — Projects router (scrollable dock) */}
+      {/* LEFT — Weekly dock + Projects router */}
       <aside className="h-full overflow-y-auto pr-1">
-        <ProjectsRouterPanel projects={projects} putJSON={putJSON} />
+        <div className="space-y-4">
+          <WeeklyResourceDock resources={resources} />
+          <ProjectsRouterPanel projects={projects} putJSON={putJSON} />
+        </div>
       </aside>
 
       {/* CENTER — Weekly Execution Spine (scrollable) */}
@@ -103,7 +109,9 @@ export default function DashboardPage() {
                   >
                     <div className="text-slate-100">{p.key ?? "Project"}</div>
                     {p.focus && (
-                      <div className="mt-1 text-xs text-slate-400">{p.focus}</div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        {p.focus}
+                      </div>
                     )}
                     {p.url && (
                       <a
@@ -145,7 +153,7 @@ export default function DashboardPage() {
       <aside className="h-full overflow-y-auto pr-1">
         <div className="space-y-4">
           <NowPanel />
-          <InboxPanel onSendToToday={sendToToday}/>
+          <InboxPanel onSendToToday={sendToToday} />
         </div>
       </aside>
     </div>
