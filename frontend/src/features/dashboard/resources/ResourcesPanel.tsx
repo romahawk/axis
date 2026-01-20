@@ -1,5 +1,4 @@
 // frontend/src/features/dashboard/resources/ResourcesPanel.tsx
-import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Panel } from "../../../components/Panel";

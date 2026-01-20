@@ -4,13 +4,32 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../../components/Panel";
 import { useWeekOutcomesEditor } from "./useWeekOutcomesEditor";
 
-type WeekOutcome = { id: string; text: string };
+type WeekOutcome = {
+  id: string;
+  text: string;
+};
+
+function clamp3(items: WeekOutcome[]) {
+  return (items ?? []).slice(0, 3);
+}
 
 export function WeekOutcomesPanel(props: {
   weekOutcomes: WeekOutcome[];
   putJSON: <T>(url: string, body: unknown) => Promise<T>;
 }) {
   const qc = useQueryClient();
+
+  const items = clamp3(props.weekOutcomes);
+  const setCount = items.filter(
+    (i) => Boolean(i.text && i.text.trim() && i.text !== "—")
+  ).length;
+
+  const pct = Math.round((setCount / 3) * 100);
+  const isWeekSet = setCount === 3;
+
+  const now = new Date();
+  const isLateWeek =
+    now.getDay() === 0 && now.getHours() >= 18; // Sunday 18:00+
 
   const {
     editMode,
@@ -28,19 +47,56 @@ export function WeekOutcomesPanel(props: {
   });
 
   return (
-    <Panel title="Top 3 Outcomes (weekly)">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-xs text-slate-500">Rule: exactly 3.</div>
+    <Panel
+      title="Top 3 Outcomes (weekly)"
+      className={isWeekSet ? "border-emerald-900/60 bg-emerald-950/10" : ""}
+    >
+      {/* Header / progress */}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="text-xs text-slate-500">Rule: exactly 3.</div>
 
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-40 rounded-full bg-slate-800">
+              <div
+                className="h-2 rounded-full bg-emerald-500/40"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-400">
+              {setCount} / 3 set
+            </div>
+
+            {isWeekSet ? (
+              <span className="rounded-full border border-emerald-900/60 bg-emerald-950/30 px-2 py-0.5 text-xs text-emerald-200">
+                WEEK SET
+              </span>
+            ) : (
+              <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-400">
+                Week in progress
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Mode controls */}
         {!editMode ? (
-          <button
-            className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
-            onClick={startEdit}
-          >
-            Edit
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
+              SET
+            </span>
+            <button
+              className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+              onClick={startEdit}
+            >
+              Edit
+            </button>
+          </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
+              EDIT
+            </span>
             <button
               className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
               onClick={cancelEdit}
@@ -59,12 +115,31 @@ export function WeekOutcomesPanel(props: {
         )}
       </div>
 
+      {/* Late-week soft signal */}
+      {!editMode && !isWeekSet && isLateWeek && (
+        <div className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/10 p-2 text-xs text-amber-200">
+          Week not set. Decide outcomes or consciously skip this week.
+        </div>
+      )}
+
+      {/* Content */}
       {!editMode ? (
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-200">
-          {(props.weekOutcomes ?? []).slice(0, 3).map((o) => (
-            <li key={o.id}>{o.text}</li>
+        <div className="space-y-2">
+          {items.map((i) => (
+            <div
+              key={i.id}
+              className="rounded-md border border-slate-900 bg-slate-950/40 px-3 py-2 text-sm text-slate-100"
+            >
+              {i.text && i.text.trim() ? i.text : `—`}
+            </div>
           ))}
-        </ol>
+
+          {isWeekSet && (
+            <div className="pt-1 text-xs text-slate-500">
+              Execution happens via <span className="text-slate-300">Today</span>.
+            </div>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
           {draft.slice(0, 3).map((v, idx) => (
@@ -79,7 +154,7 @@ export function WeekOutcomesPanel(props: {
                   return next;
                 })
               }
-              placeholder={`Outcome ${idx + 1}`}
+              placeholder={`Weekly outcome ${idx + 1}`}
             />
           ))}
 

@@ -1,15 +1,27 @@
 // frontend/src/features/dashboard/todayTop3/TodayTop3Panel.tsx
+import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import CheckList from "../../../components/CheckList";
 import { Panel } from "../../../components/Panel";
+import { useLocalStorageJson } from "../../../hooks/useLocalStorageJson";
 import { useTodayTop3Editor } from "./useTodayTop3Editor";
 
 type TodayTop3Item = { id: string; text: string; done?: boolean };
 
 type ToggleToday = {
-  mutate: (args: { kind: "outcomes" | "actions"; id: string; done: boolean }) => void;
+  mutate: (args: {
+    kind: "outcomes" | "actions";
+    id: string;
+    done: boolean;
+  }) => void;
 };
+
+const HIDE_CHECKED_KEY = "axis_today_hide_checked_v1";
+
+function clamp3(items: TodayTop3Item[]) {
+  return (items ?? []).slice(0, 3);
+}
 
 export function TodayTop3Panel(props: {
   date: string;
@@ -18,6 +30,19 @@ export function TodayTop3Panel(props: {
   toggleToday: ToggleToday;
 }) {
   const qc = useQueryClient();
+
+  const [hideChecked, setHideChecked] = useLocalStorageJson<boolean>(
+    HIDE_CHECKED_KEY,
+    false
+  );
+
+  const items = clamp3(props.todayTop3);
+  const doneCount = items.filter((i) => Boolean(i.done)).length;
+  const pct = Math.round((doneCount / 3) * 100);
+  const isCompleted = doneCount === 3;
+
+  const now = new Date();
+  const isEndOfDay = now.getHours() >= 18;
 
   const {
     editMode,
@@ -34,22 +59,75 @@ export function TodayTop3Panel(props: {
     putJSON: props.putJSON,
   });
 
+  // 🔒 AUTO-HIDE checked items when day is completed
+  React.useEffect(() => {
+    if (isCompleted && !hideChecked) {
+      setHideChecked(true);
+    }
+  }, [isCompleted, hideChecked, setHideChecked]);
+
+  const visibleItems = hideChecked ? items.filter((i) => !i.done) : items;
+
+  async function closeDay() {
+    // Soft close: reset Today to placeholders for next day
+    await props.putJSON("/api/v1/today/top3", {
+      items: ["—", "—", "—"],
+    });
+    await qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+
   return (
-    <Panel title={`Today — Top 3 (${props.date})`}>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-xs text-slate-500">
-          Rule: 3 slots. Toggle done. Edit text when needed.
+    <Panel
+      title={`Today — Top 3 (${props.date})`}
+      className={isCompleted ? "border-emerald-900/60 bg-emerald-950/10" : ""}
+    >
+      {/* Header */}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="text-xs text-slate-500">
+            Rule: 3 slots. Execute first. Edit only when needed.
+          </div>
+
+          {/* Progress */}
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-40 rounded-full bg-slate-800">
+              <div
+                className="h-2 rounded-full bg-emerald-500/50"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-400">{pct}%</div>
+
+            {isCompleted ? (
+              <span className="rounded-full border border-emerald-900/60 bg-emerald-950/30 px-2 py-0.5 text-xs text-emerald-200">
+                Day completed
+              </span>
+            ) : isEndOfDay ? (
+              <span className="rounded-full border border-amber-900/50 bg-amber-950/20 px-2 py-0.5 text-xs text-amber-200">
+                EOD
+              </span>
+            ) : null}
+          </div>
         </div>
 
+        {/* Mode controls */}
         {!editMode ? (
-          <button
-            className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
-            onClick={startEdit}
-          >
-            Edit
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
+              EXECUTE
+            </span>
+            <button
+              className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+              onClick={startEdit}
+            >
+              Edit
+            </button>
+          </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
+              EDIT
+            </span>
             <button
               className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
               onClick={cancelEdit}
@@ -68,15 +146,48 @@ export function TodayTop3Panel(props: {
         )}
       </div>
 
+      {/* Soft EOD signal */}
+      {!editMode && isEndOfDay && !isCompleted && (
+        <div className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/10 p-2 text-xs text-amber-200">
+          End-of-day check: finish one item or consciously park it.
+        </div>
+      )}
+
+      {/* EXECUTE vs EDIT */}
       {!editMode ? (
-        <CheckList
-          title=""
-          items={props.todayTop3}
-          onToggle={(id, nextDone) =>
-            // keep exact existing behavior (even though "outcomes" looks weird here)
-            props.toggleToday.mutate({ kind: "outcomes", id, done: nextDone })
-          }
-        />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+              onClick={() => setHideChecked(!hideChecked)}
+            >
+              {hideChecked ? "Show checked" : "Hide checked"}
+            </button>
+
+            {isCompleted && (
+              <button
+                type="button"
+                className="rounded-md border border-emerald-900/60 bg-emerald-950/20 px-2 py-1 text-xs text-emerald-200 hover:text-white"
+                onClick={closeDay}
+              >
+                Close day
+              </button>
+            )}
+          </div>
+
+          <CheckList
+            title=""
+            items={visibleItems}
+            onToggle={(id, nextDone) =>
+              props.toggleToday.mutate({
+                kind: "outcomes",
+                id,
+                done: nextDone,
+              })
+            }
+          />
+        </div>
       ) : (
         <div className="space-y-2">
           {draft.slice(0, 3).map((v, idx) => (

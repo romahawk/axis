@@ -1,10 +1,10 @@
 // frontend/src/pages/DashboardPage.tsx
-import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Panel } from "../components/Panel";
-import { RealityPanel } from "../features/dashboard/panels/RealityPanel";
-import { AnchorsPanel } from "../features/dashboard/panels/AnchorsPanel";
-import { DriftPanel } from "../features/dashboard/panels/DriftPanel";
+import { NowPanel } from "../features/dashboard/panels/NowPanel";
+import { InboxPanel } from "../features/dashboard/panels/InboxPanel";
+
 import { useDashboardView } from "../hooks/useDashboardView";
 import { useToggleTodayItem } from "../hooks/useToggleTodayItem";
 
@@ -13,11 +13,8 @@ import { ResourcesPanel } from "../features/dashboard/resources/ResourcesPanel";
 import type { Link, ResourceSection } from "../features/dashboard/types";
 
 import { WeekOutcomesPanel } from "../features/dashboard/weekOutcomes/WeekOutcomesPanel";
-
 import { WeekBlockersPanel } from "../features/dashboard/blockers/WeekBlockersPanel";
-
 import { TodayTop3Panel } from "../features/dashboard/todayTop3/TodayTop3Panel";
-
 import { ProjectsRouterPanel } from "../features/dashboard/projectsRouter/ProjectsRouterPanel";
 
 // Minimal fetch helper (kept local to avoid dependency assumptions)
@@ -30,11 +27,7 @@ type TodayTop3Item = { id: string; text: string; done?: boolean };
 export default function DashboardPage() {
   const { data, isLoading, isError, error } = useDashboardView();
   const toggleToday = useToggleTodayItem();
-  
-  // Keep drafts synced when dashboard data changes
-  React.useEffect(() => {
-
-  }, [data]);
+  const qc = useQueryClient();
 
   if (isLoading) return <div className="text-slate-400">Loading…</div>;
 
@@ -55,7 +48,26 @@ export default function DashboardPage() {
   const weekBlockers = (data.week.blockers ?? []) as WeekBlocker[];
   const todayTop3 = (data.today.top3 ?? []) as TodayTop3Item[];
 
-  
+  // -----------------------------
+  // Inbox -> Today/Week routing (no new backend)
+  // Today: fill first empty slot in Today Top 3, else replace slot 3.
+  // Week: fill first empty slot in Week Blockers (as minimal Week buffer), else replace slot 3.
+  // -----------------------------
+  async function sendToToday(text: string) {
+    const cleaned = (text ?? "").trim();
+    if (!cleaned) return;
+
+    const slots = todayTop3.slice(0, 3).map((i) => (i.text ?? "—").trim());
+    while (slots.length < 3) slots.push("—");
+
+    let idx = slots.findIndex((t) => t === "—" || t === "" || t === "-");
+    if (idx === -1) idx = 2;
+    slots[idx] = cleaned;
+
+    await putJSON("/api/v1/today/top3", { items: slots });
+    await qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+
   // -----------------------------
   // Layout (full-screen, scrollable columns)
   // -----------------------------
@@ -91,9 +103,7 @@ export default function DashboardPage() {
                   >
                     <div className="text-slate-100">{p.key ?? "Project"}</div>
                     {p.focus && (
-                      <div className="mt-1 text-xs text-slate-400">
-                        {p.focus}
-                      </div>
+                      <div className="mt-1 text-xs text-slate-400">{p.focus}</div>
                     )}
                     {p.url && (
                       <a
@@ -131,12 +141,11 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* RIGHT — Reality & Drift (scrollable) */}
+      {/* RIGHT — Time + Inbox + (existing) Anchors & Drift */}
       <aside className="h-full overflow-y-auto pr-1">
         <div className="space-y-4">
-          <RealityPanel commitments={data.reality.commitments} />
-          <AnchorsPanel anchors={data.week.anchors ?? {}} />
-          <DriftPanel drift={data.drift ?? {}} />
+          <NowPanel />
+          <InboxPanel onSendToToday={sendToToday}/>
         </div>
       </aside>
     </div>
