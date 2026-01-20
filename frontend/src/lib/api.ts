@@ -1,21 +1,24 @@
 // frontend/src/lib/api.ts
-// Backward-compatible API helpers.
-// This file must NOT hardcode localhost in production.
-// It reads API_BASE_URL from config and provides fetchJSON used across the app.
+// Central API helpers for Axis.
+// MUST NOT hardcode localhost in production.
 
 import { API_BASE_URL } from "../config/api";
 
 export const API_BASE = API_BASE_URL;
 
 export function toApiUrl(pathOrUrl: string) {
-  // absolute URL: keep as-is
+  // Absolute URL → keep as-is
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
 
+  // Relative path → prefix with API base
   const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   return `${API_BASE}${path}`;
 }
 
-export async function fetchJSON<T>(pathOrUrl: string, init?: RequestInit): Promise<T> {
+export async function fetchJSON<T>(
+  pathOrUrl: string,
+  init?: RequestInit
+): Promise<T> {
   const url = toApiUrl(pathOrUrl);
 
   const res = await fetch(url, {
