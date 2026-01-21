@@ -1,13 +1,14 @@
-# backend/main.py (FULL PATCHED)
+# backend/main.py (FULL UPDATED) — adds Journal MVP endpoints + persistent storage
 from __future__ import annotations
 
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -29,43 +30,31 @@ app.add_middleware(
 # Persistence paths (MVP)
 # -------------------------------------------------------------------
 # IMPORTANT:
-# - In production (Fly.io), mount a Volume at /data and set DATA_DIR=/data
-# - Locally, it will fall back to ./data next to this file.
-_env_data_dir = os.getenv("DATA_DIR", "").strip()
-if _env_data_dir:
-    DATA_DIR = Path(_env_data_dir)
-else:
-    DATA_DIR = Path("/data") if Path("/data").exists() else (Path(__file__).parent / "data")
-
+# - In production (Fly), mount a volume at /data (recommended), or set DATA_DIR via env.
+# - In dev, /data will be created locally if it doesn't exist.
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 TODAY_STATE_PATH = DATA_DIR / "today_state.json"
 WEEK_STATE_PATH = DATA_DIR / "week_state.json"
 PROJECTS_PATH = DATA_DIR / "projects.json"
 RESOURCES_PATH = DATA_DIR / "resources.json"
 REALITY_PATH = DATA_DIR / "reality.json"
+JOURNAL_PATH = DATA_DIR / "journal.json"
 
 
-def _ensure_dir_for(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _ensure_data_dir() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def save_json(path: Path, data: dict) -> None:
-    """
-    Atomic-ish JSON save:
-    - write to .tmp then replace
-    """
-    _ensure_dir_for(path)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    _ensure_data_dir()
+    tmp = path.with_suffix(".tmp")
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     tmp.replace(path)
 
 
 def load_json_or_none(path: Path) -> Optional[dict]:
-    """
-    Safe loader:
-    - NEVER writes defaults
-    - Returns dict or None
-    """
+    _ensure_data_dir()
     if not path.exists():
         return None
     try:
@@ -73,7 +62,20 @@ def load_json_or_none(path: Path) -> Optional[dict]:
             data = json.load(f)
         return data if isinstance(data, dict) else None
     except Exception:
+        # CRITICAL: do NOT overwrite on read failure
         return None
+
+
+def load_or_init(path: Path, default_factory) -> dict:
+    """
+    Load dict from json if present and readable; otherwise initialize with defaults and save once.
+    """
+    existing = load_json_or_none(path)
+    if existing is not None:
+        return existing
+    doc = default_factory()
+    save_json(path, doc)
+    return doc
 
 
 def _ensure_3_texts(values: list[str], placeholder: str = "—") -> list[str]:
@@ -105,6 +107,10 @@ def _ensure_3_items(items: list[dict], prefix: str, placeholder: str = "—") ->
     return out
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 # -------------------------------------------------------------------
 # Defaults
 # -------------------------------------------------------------------
@@ -117,7 +123,7 @@ def _default_today_state() -> dict:
             {"id": "t2", "text": "Second needle-mover", "done": False},
             {"id": "t3", "text": "Third needle-mover", "done": False},
         ],
-        # legacy keys optional for backward-compat
+        # legacy keys optional
         "outcomes": [],
         "actions": [],
         "blockers": [],
@@ -202,6 +208,10 @@ def _default_reality() -> dict:
     }
 
 
+def _default_journal() -> dict:
+    return {"entries": []}
+
+
 # -------------------------------------------------------------------
 # Normalizers (manual-first, minimal)
 # -------------------------------------------------------------------
@@ -233,7 +243,6 @@ def normalize_projects(doc: dict) -> dict:
                 continue
             label = str(l.get("label", "")).strip()
             url = str(l.get("url", "")).strip()
-            # Allow empty url if you want to show placeholder link in UI? (currently require both)
             if label and url:
                 norm_links.append({"label": label, "url": url})
 
@@ -331,16 +340,9 @@ def normalize_week_state(doc: dict) -> dict:
 
 
 def normalize_today_state(doc: dict) -> dict:
-    """
-    Backward-compatible migration:
-    - v1 canonical: { date, top3:[{id,text,done}x3] }
-    - if legacy { outcomes:[{id,text,done}...] } exists and top3 missing -> map outcomes -> top3
-    - resets done flags when date changes (keeps texts)
-    """
     today = date.today().isoformat()
     stored_date = str(doc.get("date") or "")
 
-    # Determine source list for top3
     top3 = doc.get("top3", None)
     if not isinstance(top3, list):
         top3 = None
@@ -354,7 +356,6 @@ def normalize_today_state(doc: dict) -> dict:
     else:
         top3_items = _ensure_3_items(top3, prefix="t", placeholder="—")
 
-    # Date rollover: keep texts, reset done=false
     if stored_date != today:
         for it in top3_items:
             it["done"] = False
@@ -369,66 +370,72 @@ def normalize_today_state(doc: dict) -> dict:
     return {
         "date": today,
         "top3": top3_items,
-        # legacy-compatible fields (not required by dashboard)
         "outcomes": doc.get("outcomes", []) if isinstance(doc.get("outcomes", []), list) else [],
         "actions": actions,
         "blockers": blockers,
     }
 
 
-def normalize_reality(doc: dict) -> dict:
-    commitments = doc.get("commitments", [])
-    if not isinstance(commitments, list):
-        commitments = []
-    out = []
-    for c in commitments:
-        if not isinstance(c, dict):
-            continue
-        _id = str(c.get("id", "")).strip()
-        text = str(c.get("text", "")).strip()
-        day = str(c.get("day", "")).strip()
-        if _id and text:
-            out.append({"id": _id, "text": text, "day": day})
-    return {"commitments": out}
+def normalize_journal(doc: dict) -> dict:
+    """
+    Keeps only:
+    - entries: list[dict]
+    Does not validate deep schema (MVP). Ensures list type.
+    """
+    entries = doc.get("entries", [])
+    if not isinstance(entries, list):
+        entries = []
+    # keep only dict entries
+    entries = [e for e in entries if isinstance(e, dict)]
+    return {"entries": entries}
 
 
 # -------------------------------------------------------------------
-# Load state (SAFE: never overwrites existing files on startup)
+# Load state (safe init)
 # -------------------------------------------------------------------
-raw_today = load_json_or_none(TODAY_STATE_PATH)
-if raw_today is None:
-    TODAY_STATE = normalize_today_state(_default_today_state())
-    save_json(TODAY_STATE_PATH, TODAY_STATE)  # first-run only
-else:
-    TODAY_STATE = normalize_today_state(raw_today)
+TODAY_STATE = normalize_today_state(load_or_init(TODAY_STATE_PATH, _default_today_state))
+WEEK_STATE = normalize_week_state(load_or_init(WEEK_STATE_PATH, _default_week_state))
+PROJECTS = normalize_projects(load_or_init(PROJECTS_PATH, _default_projects))
+RESOURCES = normalize_resources(load_or_init(RESOURCES_PATH, _default_resources))
+REALITY = load_or_init(REALITY_PATH, _default_reality)
+JOURNAL = normalize_journal(load_or_init(JOURNAL_PATH, _default_journal))
 
-raw_week = load_json_or_none(WEEK_STATE_PATH)
-if raw_week is None:
-    WEEK_STATE = normalize_week_state(_default_week_state())
-    save_json(WEEK_STATE_PATH, WEEK_STATE)
-else:
-    WEEK_STATE = normalize_week_state(raw_week)
 
-raw_projects = load_json_or_none(PROJECTS_PATH)
-if raw_projects is None:
-    PROJECTS = normalize_projects(_default_projects())
-    save_json(PROJECTS_PATH, PROJECTS)
-else:
-    PROJECTS = normalize_projects(raw_projects)
+def _snapshot_now() -> dict:
+    """
+    Snapshot current state for journal entries.
+    Keep it compact; frontend can render collapsible sections.
+    """
+    global TODAY_STATE, WEEK_STATE
 
-raw_resources = load_json_or_none(RESOURCES_PATH)
-if raw_resources is None:
-    RESOURCES = normalize_resources(_default_resources())
-    save_json(RESOURCES_PATH, RESOURCES)
-else:
-    RESOURCES = normalize_resources(raw_resources)
+    TODAY_STATE = normalize_today_state(TODAY_STATE)
+    WEEK_STATE = normalize_week_state(WEEK_STATE)
 
-raw_reality = load_json_or_none(REALITY_PATH)
-if raw_reality is None:
-    REALITY = normalize_reality(_default_reality())
-    save_json(REALITY_PATH, REALITY)
-else:
-    REALITY = normalize_reality(raw_reality)
+    projects = PROJECTS.get("projects", [])
+    active = [p for p in projects if p.get("is_active") is True][:3]
+
+    return {
+        "today": {
+            "date": TODAY_STATE.get("date"),
+            "top3": TODAY_STATE.get("top3", [])[:3],
+        },
+        "week": {
+            "week_id": WEEK_STATE.get("week_id"),
+            "mode": WEEK_STATE.get("mode", "OFF"),
+            "outcomes": WEEK_STATE.get("outcomes", [])[:3],
+            "blockers": WEEK_STATE.get("blockers", [])[:3],
+            "anchors": WEEK_STATE.get("anchors", {}),
+            "active_projects": [
+                {
+                    "key": p.get("key"),
+                    "name": p.get("name"),
+                    "links": p.get("links", []),
+                }
+                for p in active
+            ],
+        },
+        "projects": projects,
+    }
 
 
 # -------------------------------------------------------------------
@@ -496,7 +503,7 @@ def put_resources(payload: ResourcesDoc):
 
 
 # -------------------------------------------------------------------
-# Week central-column CRUD (Outcomes + Blockers)
+# Week CRUD (Outcomes + Blockers)
 # -------------------------------------------------------------------
 class WeekOutcomesPut(BaseModel):
     outcomes: list[str]
@@ -533,7 +540,7 @@ def put_week_blockers(payload: WeekBlockersPut):
 
 
 # -------------------------------------------------------------------
-# Today central-column CRUD (Top 3)
+# Today CRUD (Top 3)
 # -------------------------------------------------------------------
 class TodayTop3Put(BaseModel):
     items: list[str]
@@ -573,13 +580,122 @@ def toggle_today_top3(item_id: str, payload: ToggleDone):
 
 
 # -------------------------------------------------------------------
+# Journal (MVP): Daily Closeout + Weekly Review + Timeline
+# -------------------------------------------------------------------
+JournalType = Literal["daily", "weekly"]
+
+
+class DailyCloseoutIn(BaseModel):
+    wins: list[str] = []
+    miss: str = ""
+    fix: str = ""
+
+
+class WeeklyOutcomeResultIn(BaseModel):
+    id: str
+    achieved: bool = False
+    note: str = ""
+
+
+class WeeklyReviewIn(BaseModel):
+    outcomes: list[WeeklyOutcomeResultIn] = []
+    constraint: str = ""
+    decision: str = ""
+    next_focus: str = ""
+
+
+def _append_journal_entry(entry: dict) -> dict:
+    global JOURNAL
+    JOURNAL = normalize_journal(JOURNAL)
+    entries = JOURNAL.get("entries", [])
+    entries.append(entry)
+    JOURNAL["entries"] = entries
+    save_json(JOURNAL_PATH, JOURNAL)
+    return entry
+
+
+@app.get("/api/v1/journal")
+def list_journal(
+    limit: int = Query(50, ge=1, le=200),
+    type: Optional[JournalType] = Query(None),
+):
+    global JOURNAL
+    JOURNAL = normalize_journal(JOURNAL)
+    entries = JOURNAL.get("entries", [])
+
+    if type:
+        entries = [e for e in entries if e.get("type") == type]
+
+    # newest first
+    entries = list(reversed(entries))[:limit]
+    return {"entries": entries, "limit": limit, "type": type}
+
+
+@app.post("/api/v1/journal/daily")
+def create_daily_closeout(payload: DailyCloseoutIn):
+    wins = [str(w).strip() for w in (payload.wins or []) if str(w).strip()]
+    wins = wins[:3]  # keep it tight
+    miss = str(payload.miss or "").strip()
+    fix = str(payload.fix or "").strip()
+
+    entry = {
+        "id": str(uuid4()),
+        "type": "daily",
+        "created_at": _utc_now_iso(),
+        "date": date.today().isoformat(),
+        "wins": wins,
+        "miss": miss,
+        "fix": fix,
+        "snapshot": _snapshot_now(),
+    }
+    return _append_journal_entry(entry)
+
+
+@app.post("/api/v1/journal/weekly")
+def create_weekly_review(payload: WeeklyReviewIn):
+    global WEEK_STATE
+    WEEK_STATE = normalize_week_state(WEEK_STATE)
+
+    norm_outcomes = []
+    for o in payload.outcomes or []:
+        norm_outcomes.append(
+            {"id": str(o.id), "achieved": bool(o.achieved), "note": str(o.note or "").strip()}
+        )
+
+    entry = {
+        "id": str(uuid4()),
+        "type": "weekly",
+        "created_at": _utc_now_iso(),
+        "week_id": WEEK_STATE.get("week_id", date.today().isoformat()),
+        "outcomes": norm_outcomes,
+        "constraint": str(payload.constraint or "").strip(),
+        "decision": str(payload.decision or "").strip(),
+        "next_focus": str(payload.next_focus or "").strip(),
+        "snapshot": _snapshot_now(),
+    }
+    return _append_journal_entry(entry)
+
+
+@app.get("/api/v1/journal/{entry_id}")
+def get_journal_entry(entry_id: str):
+    """
+    Optional endpoint (useful for later). Kept lightweight.
+    """
+    global JOURNAL
+    JOURNAL = normalize_journal(JOURNAL)
+    for e in JOURNAL.get("entries", []):
+        if e.get("id") == entry_id:
+            return e
+    raise HTTPException(status_code=404, detail="entry not found")
+
+
+# -------------------------------------------------------------------
 # Views: Dashboard (Axis v1 one-screen)
 # -------------------------------------------------------------------
 @app.get("/api/v1/views/dashboard")
 def dashboard_view():
     global TODAY_STATE, WEEK_STATE
 
-    # Normalize on read (handles day rollover)
     TODAY_STATE = normalize_today_state(TODAY_STATE)
     WEEK_STATE = normalize_week_state(WEEK_STATE)
 
