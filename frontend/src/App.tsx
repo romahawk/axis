@@ -1,9 +1,13 @@
+import { useState } from "react";
+import { BookOpen, Cpu, CircleDot } from "lucide-react";
+
 import { useMe } from "./hooks/useMe";
 import DashboardPage from "./pages/DashboardPage";
-import { Cpu, CircleDot } from "lucide-react";
+import { AxisGuideDrawer } from "./components/axis-guide/AxisGuideDrawer";
 
 export default function App() {
   const { data: me, isLoading, isError } = useMe();
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -23,14 +27,27 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <CircleDot className="h-3.5 w-3.5 text-indigo-400/70" />
-            {isLoading && "Loading…"}
-            {isError && "API error"}
-            {me && `${me.name} · ${me.role}`}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setGuideOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-800/70 bg-slate-950/40 px-3 py-1.5 text-xs text-slate-200 shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset] hover:bg-slate-950/60"
+              aria-label="Open AXIS Guide"
+              title="AXIS Guide"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-slate-300" />
+              AXIS Guide
+            </button>
+
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <CircleDot className="h-3.5 w-3.5 text-indigo-400/70" />
+              {isLoading && "Loading…"}
+              {isError && "API error"}
+              {me && `${me.name} · ${me.role}`}
+            </div>
           </div>
         </div>
-        {/* subtle glow line */}
+
         <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
       </header>
 
@@ -39,6 +56,8 @@ export default function App() {
           <DashboardPage />
         </div>
       </main>
+
+      <AxisGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
 }
