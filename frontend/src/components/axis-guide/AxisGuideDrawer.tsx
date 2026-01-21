@@ -1,5 +1,3 @@
-// frontend/src/components/axis-guide/AxisGuideDrawer.tsx
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AxisGuideContent } from "./AxisGuideContent";
@@ -57,7 +55,7 @@ export function AxisGuideDrawer({ open, onClose }: AxisGuideDrawerProps) {
       <div
         className={[
           "absolute inset-0 transition-opacity duration-200",
-          "bg-black/65",
+          "bg-black/70",
           open ? "opacity-100" : "opacity-0",
         ].join(" ")}
         onMouseDown={onClose}
@@ -72,9 +70,12 @@ export function AxisGuideDrawer({ open, onClose }: AxisGuideDrawerProps) {
         aria-label="AXIS Guide"
         className={[
           "absolute right-0 top-0 h-full w-full sm:w-[520px] md:w-[640px]",
-          "bg-slate-900 text-slate-100",
-          "border-l border-slate-700/60",
-          "shadow-2xl",
+          // sci-fi glass + depth
+          "bg-gradient-to-b from-slate-950 via-slate-950/95 to-slate-900/95",
+          "text-slate-100",
+          "border-l border-indigo-400/20",
+          "shadow-[0_0_0_1px_rgba(99,102,241,0.12)_inset,0_25px_60px_rgba(0,0,0,0.55)]",
+          "backdrop-blur-xl",
           "transition-transform duration-200 ease-out",
           open ? "translate-x-0" : "translate-x-full",
           "outline-none",
@@ -83,12 +84,17 @@ export function AxisGuideDrawer({ open, onClose }: AxisGuideDrawerProps) {
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-700/60 bg-slate-950/30">
+        <div className="relative flex items-center justify-between gap-3 p-4 border-b border-indigo-400/15 bg-slate-950/40">
+          {/* subtle neon line */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/35 to-transparent" />
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-100 truncate">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">
+              Reference
+            </div>
+            <div className="text-base font-semibold text-slate-100 truncate">
               AXIS Guide
             </div>
-            <div className="text-xs text-slate-300 truncate">
+            <div className="text-xs text-slate-300/90 truncate">
               How to use AXIS to execute under complexity
             </div>
           </div>
@@ -96,7 +102,14 @@ export function AxisGuideDrawer({ open, onClose }: AxisGuideDrawerProps) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-slate-700/60 bg-slate-800/40 hover:bg-slate-800/70 transition text-sm text-slate-100"
+            className={[
+              "px-3 py-1.5 rounded-lg text-sm",
+              "border border-indigo-400/25",
+              "bg-slate-900/50 hover:bg-slate-800/60",
+              "text-slate-100",
+              "shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset]",
+              "transition",
+            ].join(" ")}
           >
             Close
           </button>
@@ -113,7 +126,8 @@ export function AxisGuideDrawer({ open, onClose }: AxisGuideDrawerProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-700/60 text-xs text-slate-300 bg-slate-950/20">
+        <div className="relative p-4 border-t border-indigo-400/15 text-xs text-slate-300/90 bg-slate-950/25">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-400/25 to-transparent" />
           Rule: Reference only. Don’t turn AXIS into reading.
         </div>
       </div>

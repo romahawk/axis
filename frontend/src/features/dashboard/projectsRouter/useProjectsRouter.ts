@@ -55,8 +55,17 @@ export function useProjectsRouter(params: {
   async function saveProjectDraft() {
     if (!projectDraft) return;
 
+    // Guard: names are user-facing and must never be empty.
+    const trimmedName = (projectDraft.name ?? "").trim();
+    if (!trimmedName) {
+      setProjectSaveError("Project name cannot be empty");
+      return;
+    }
+
+    const normalizedDraft: Project = { ...projectDraft, name: trimmedName };
+
     const nextProjects = projects.map((p) =>
-      p.key === projectDraft.key ? projectDraft : p
+      p.key === normalizedDraft.key ? normalizedDraft : p
     );
 
     try {
@@ -106,7 +115,8 @@ export function useProjectsRouter(params: {
     saveProjects(nextProjects)
       .then(() => {
         setEditingProjectKey(key);
-        setProjectDraft(newProject);
+        // Use a copy so edits don't accidentally mutate the object we pushed into the list.
+        setProjectDraft(JSON.parse(JSON.stringify(newProject)) as Project);
       })
       .catch(() => {
         // error already set

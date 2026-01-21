@@ -265,10 +265,13 @@ export function ProjectsRouterPanel(props: {
                       {(projectDraft?.links ?? []).map((l, idx) => (
                         <div
                           key={idx}
-                          className="grid grid-cols-[1fr_1fr_auto] gap-2"
+                          // ✅ Responsive layout to prevent overlap in narrow sidebar:
+                          // - default: stack (Label, URL, Remove)
+                          // - md+: 2 columns + remove button
+                          className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center"
                         >
                           <input
-                            className="rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-slate-600"
+                            className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-slate-600"
                             value={l.label}
                             placeholder="Label"
                             onChange={(e) =>
@@ -285,7 +288,7 @@ export function ProjectsRouterPanel(props: {
                           />
 
                           <input
-                            className="rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-slate-600"
+                            className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-100 outline-none focus:border-slate-600"
                             value={l.url}
                             placeholder="https://..."
                             onChange={(e) =>
@@ -299,7 +302,7 @@ export function ProjectsRouterPanel(props: {
                           />
 
                           <button
-                            className="inline-flex items-center justify-center rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                            className="inline-flex w-full items-center justify-center rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white md:w-auto"
                             onClick={() =>
                               setProjectDraft((d) => {
                                 if (!d) return d;
