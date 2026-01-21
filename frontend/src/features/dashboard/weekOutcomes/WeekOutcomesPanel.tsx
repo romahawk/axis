@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { Panel } from "../../../components/Panel";
 import { useWeekOutcomesEditor } from "./useWeekOutcomesEditor";
+import { WeeklyOutcomesHintDialog } from "./WeeklyOutcomesHintDialog";
 
 type WeekOutcome = {
   id: string;
@@ -54,7 +55,10 @@ export function WeekOutcomesPanel(props: {
       {/* Header / progress */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="space-y-2">
-          <div className="text-xs text-slate-500">Rule: exactly 3.</div>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>Rule: exactly 3.</span>
+            <WeeklyOutcomesHintDialog />
+          </div>
 
           <div className="flex items-center gap-3">
             <div className="h-2 w-40 rounded-full bg-slate-800">
