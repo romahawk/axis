@@ -22,4 +22,4 @@ primary_region = "fra"
 
 [mounts]
   source = "axis_data"
-  destination = "/app/data"
+  destination = "/data"

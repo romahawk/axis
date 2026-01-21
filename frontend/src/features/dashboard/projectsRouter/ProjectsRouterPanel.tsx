@@ -17,6 +17,11 @@ import { useProjectsRouter } from "./useProjectsRouter";
 type Link = { label: string; url: string };
 type Project = { key: string; name: string; is_active?: boolean; links: Link[] };
 
+function displayProjectName(p: Project) {
+  const n = (p.name ?? "").trim();
+  return n.length ? n : "Untitled project";
+}
+
 export function ProjectsRouterPanel(props: {
   projects: Project[];
   putJSON: <T>(url: string, body: unknown) => Promise<T>;
@@ -106,7 +111,7 @@ export function ProjectsRouterPanel(props: {
           </option>
           {inactiveProjects.map((p) => (
             <option key={p.key} value={p.key}>
-              {p.name || p.key}
+              {displayProjectName(p)}
             </option>
           ))}
         </select>
@@ -165,12 +170,15 @@ export function ProjectsRouterPanel(props: {
                           }
                         />
                       ) : (
-                        p.name
+                        displayProjectName(p)
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-1 text-xs text-slate-500">{p.key}</div>
+                  {/* Internal key is intentionally hidden from the normal UI */}
+                  {isEditing ? (
+                    <div className="mt-1 text-xs text-slate-500">{p.key}</div>
+                  ) : null}
                 </button>
 
                 {/* Actions */}
@@ -248,7 +256,7 @@ export function ProjectsRouterPanel(props: {
                             target="_blank"
                             rel="noreferrer"
                             className="group flex items-center justify-between rounded-md border border-slate-900 bg-slate-950/40 px-2 py-1.5 text-xs text-slate-300 hover:text-white"
-                            title={`${p.name} • ${l.label}`}
+                            title={`${displayProjectName(p)} • ${l.label}`}
                           >
                             <span className="truncate">{l.label}</span>
                             <ExternalLink className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100" />
@@ -265,9 +273,7 @@ export function ProjectsRouterPanel(props: {
                       {(projectDraft?.links ?? []).map((l, idx) => (
                         <div
                           key={idx}
-                          // ✅ Responsive layout to prevent overlap in narrow sidebar:
-                          // - default: stack (Label, URL, Remove)
-                          // - md+: 2 columns + remove button
+                          // ✅ responsive: stack in narrow sidebar, 2 cols + remove on md+
                           className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center"
                         >
                           <input

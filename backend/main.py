@@ -1,11 +1,11 @@
-# backend/main.py (FULL UPDATED)
+# backend/main.py (FULL PATCHED)
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+import os
+from datetime import date
 from pathlib import Path
 from typing import Optional
-from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +16,9 @@ app = FastAPI(title="Axis API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:5173",
-    "https://axis-personal.vercel.app",
-    "https://axis-dev.vercel.app",
+        "http://localhost:5173",
+        "https://axis-personal.vercel.app",
+        "https://axis-dev.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -28,37 +28,52 @@ app.add_middleware(
 # -------------------------------------------------------------------
 # Persistence paths (MVP)
 # -------------------------------------------------------------------
-DATA_DIR = Path(__file__).parent / "data"
-TODAY_STATE_PATH = DATA_DIR / "today_state.json"
+# IMPORTANT:
+# - In production (Fly.io), mount a Volume at /data and set DATA_DIR=/data
+# - Locally, it will fall back to ./data next to this file.
+_env_data_dir = os.getenv("DATA_DIR", "").strip()
+if _env_data_dir:
+    DATA_DIR = Path(_env_data_dir)
+else:
+    DATA_DIR = Path("/data") if Path("/data").exists() else (Path(__file__).parent / "data")
 
+TODAY_STATE_PATH = DATA_DIR / "today_state.json"
 WEEK_STATE_PATH = DATA_DIR / "week_state.json"
 PROJECTS_PATH = DATA_DIR / "projects.json"
 RESOURCES_PATH = DATA_DIR / "resources.json"
 REALITY_PATH = DATA_DIR / "reality.json"
 
 
+def _ensure_dir_for(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
 def save_json(path: Path, data: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
+    """
+    Atomic-ish JSON save:
+    - write to .tmp then replace
+    """
+    _ensure_dir_for(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     tmp.replace(path)
 
 
-def load_json(path: Path, default: dict) -> dict:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-    if path.exists():
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-
-    save_json(path, default)
-    return default
+def load_json_or_none(path: Path) -> Optional[dict]:
+    """
+    Safe loader:
+    - NEVER writes defaults
+    - Returns dict or None
+    """
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
 
 
 def _ensure_3_texts(values: list[str], placeholder: str = "—") -> list[str]:
@@ -102,7 +117,7 @@ def _default_today_state() -> dict:
             {"id": "t2", "text": "Second needle-mover", "done": False},
             {"id": "t3", "text": "Third needle-mover", "done": False},
         ],
-        # keep legacy keys optional for backward-compat (not used by dashboard)
+        # legacy keys optional for backward-compat
         "outcomes": [],
         "actions": [],
         "blockers": [],
@@ -218,6 +233,7 @@ def normalize_projects(doc: dict) -> dict:
                 continue
             label = str(l.get("label", "")).strip()
             url = str(l.get("url", "")).strip()
+            # Allow empty url if you want to show placeholder link in UI? (currently require both)
             if label and url:
                 norm_links.append({"label": label, "url": url})
 
@@ -262,11 +278,6 @@ def normalize_resources(doc: dict) -> dict:
 
 
 def normalize_week_state(doc: dict) -> dict:
-    """
-    Ensures:
-    - outcomes: exactly 3 {id,text}
-    - blockers: exactly 3 {id,text}
-    """
     iso = date.today().isocalendar()
     default_week_id = f"{iso.year}-W{iso.week:02d}"
 
@@ -348,7 +359,6 @@ def normalize_today_state(doc: dict) -> dict:
         for it in top3_items:
             it["done"] = False
 
-    # Keep legacy keys (optional)
     actions = doc.get("actions", [])
     blockers = doc.get("blockers", [])
     if not isinstance(actions, list):
@@ -366,22 +376,59 @@ def normalize_today_state(doc: dict) -> dict:
     }
 
 
+def normalize_reality(doc: dict) -> dict:
+    commitments = doc.get("commitments", [])
+    if not isinstance(commitments, list):
+        commitments = []
+    out = []
+    for c in commitments:
+        if not isinstance(c, dict):
+            continue
+        _id = str(c.get("id", "")).strip()
+        text = str(c.get("text", "")).strip()
+        day = str(c.get("day", "")).strip()
+        if _id and text:
+            out.append({"id": _id, "text": text, "day": day})
+    return {"commitments": out}
+
+
 # -------------------------------------------------------------------
-# Load state (and persist normalized)
+# Load state (SAFE: never overwrites existing files on startup)
 # -------------------------------------------------------------------
-TODAY_STATE = normalize_today_state(load_json(TODAY_STATE_PATH, _default_today_state()))
-save_json(TODAY_STATE_PATH, TODAY_STATE)
+raw_today = load_json_or_none(TODAY_STATE_PATH)
+if raw_today is None:
+    TODAY_STATE = normalize_today_state(_default_today_state())
+    save_json(TODAY_STATE_PATH, TODAY_STATE)  # first-run only
+else:
+    TODAY_STATE = normalize_today_state(raw_today)
 
-WEEK_STATE = normalize_week_state(load_json(WEEK_STATE_PATH, _default_week_state()))
-save_json(WEEK_STATE_PATH, WEEK_STATE)
+raw_week = load_json_or_none(WEEK_STATE_PATH)
+if raw_week is None:
+    WEEK_STATE = normalize_week_state(_default_week_state())
+    save_json(WEEK_STATE_PATH, WEEK_STATE)
+else:
+    WEEK_STATE = normalize_week_state(raw_week)
 
-PROJECTS = normalize_projects(load_json(PROJECTS_PATH, _default_projects()))
-save_json(PROJECTS_PATH, PROJECTS)
+raw_projects = load_json_or_none(PROJECTS_PATH)
+if raw_projects is None:
+    PROJECTS = normalize_projects(_default_projects())
+    save_json(PROJECTS_PATH, PROJECTS)
+else:
+    PROJECTS = normalize_projects(raw_projects)
 
-RESOURCES = normalize_resources(load_json(RESOURCES_PATH, _default_resources()))
-save_json(RESOURCES_PATH, RESOURCES)
+raw_resources = load_json_or_none(RESOURCES_PATH)
+if raw_resources is None:
+    RESOURCES = normalize_resources(_default_resources())
+    save_json(RESOURCES_PATH, RESOURCES)
+else:
+    RESOURCES = normalize_resources(raw_resources)
 
-REALITY = load_json(REALITY_PATH, _default_reality())
+raw_reality = load_json_or_none(REALITY_PATH)
+if raw_reality is None:
+    REALITY = normalize_reality(_default_reality())
+    save_json(REALITY_PATH, REALITY)
+else:
+    REALITY = normalize_reality(raw_reality)
 
 
 # -------------------------------------------------------------------
@@ -417,7 +464,6 @@ def put_projects(payload: ProjectsDoc):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Axis constraint: max 3 active projects
     active_count = sum(1 for p in normalized["projects"] if p.get("is_active"))
     if active_count > 3:
         raise HTTPException(status_code=400, detail="Max 3 active projects allowed")
@@ -495,15 +541,10 @@ class TodayTop3Put(BaseModel):
 
 @app.put("/api/v1/today/top3")
 def put_today_top3(payload: TodayTop3Put):
-    """
-    Sets texts for today's Top 3 (exactly 3 slots).
-    Done flags are reset to false for edited slots (simple, predictable).
-    """
     global TODAY_STATE
     texts = _ensure_3_texts(payload.items, placeholder="—")
 
-    # Keep ids stable; reset done=false for any update (v1 simplicity)
-    TODAY_STATE = normalize_today_state(TODAY_STATE)  # ensure date + structure
+    TODAY_STATE = normalize_today_state(TODAY_STATE)
     TODAY_STATE["top3"] = [
         {"id": "t1", "text": texts[0], "done": False},
         {"id": "t2", "text": texts[1], "done": False},
@@ -538,7 +579,7 @@ def toggle_today_top3(item_id: str, payload: ToggleDone):
 def dashboard_view():
     global TODAY_STATE, WEEK_STATE
 
-    # Normalize on read (handles day rollover without extra jobs)
+    # Normalize on read (handles day rollover)
     TODAY_STATE = normalize_today_state(TODAY_STATE)
     WEEK_STATE = normalize_week_state(WEEK_STATE)
 
@@ -587,7 +628,6 @@ def dashboard_view():
 # -------------------------------------------------------------------
 @app.get("/api/v1/views/today")
 def today_view():
-    # Return both canonical + legacy keys (safe)
     global TODAY_STATE
     TODAY_STATE = normalize_today_state(TODAY_STATE)
     return TODAY_STATE
@@ -595,23 +635,16 @@ def today_view():
 
 @app.patch("/api/v1/views/today/{kind}/{item_id}")
 def toggle_today_item(kind: str, item_id: str, payload: ToggleDone):
-    """
-    Backward-compatible toggle:
-    - If kind == "outcomes": toggles Top 3 item (t1/t2/t3) by id match fallback
-    - If old outcomes ids are used, we try both top3 and legacy outcomes.
-    """
     global TODAY_STATE
     TODAY_STATE = normalize_today_state(TODAY_STATE)
 
     if kind == "outcomes":
-        # Prefer canonical Top 3
         for it in TODAY_STATE.get("top3", []):
             if it.get("id") == item_id:
                 it["done"] = payload.done
                 save_json(TODAY_STATE_PATH, TODAY_STATE)
                 return it
 
-        # Fallback legacy outcomes list (if you still have it)
         legacy = TODAY_STATE.get("outcomes", [])
         if isinstance(legacy, list):
             for it in legacy:
