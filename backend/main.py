@@ -604,6 +604,25 @@ class WeeklyReviewIn(BaseModel):
     next_focus: str = ""
 
 
+class DailyCloseoutPatch(BaseModel):
+    wins: Optional[list[str]] = None
+    miss: Optional[str] = None
+    fix: Optional[str] = None
+
+
+class WeeklyOutcomeResultPatch(BaseModel):
+    id: str
+    achieved: Optional[bool] = None
+    note: Optional[str] = None
+
+
+class WeeklyReviewPatch(BaseModel):
+    outcomes: Optional[list[WeeklyOutcomeResultPatch]] = None
+    constraint: Optional[str] = None
+    decision: Optional[str] = None
+    next_focus: Optional[str] = None
+
+
 def _append_journal_entry(entry: dict) -> dict:
     global JOURNAL
     JOURNAL = normalize_journal(JOURNAL)
@@ -613,6 +632,16 @@ def _append_journal_entry(entry: dict) -> dict:
     save_json(JOURNAL_PATH, JOURNAL)
     return entry
 
+def _clean_wins(wins: list[str]) -> list[str]:
+    cleaned = [str(w).strip() for w in (wins or []) if str(w).strip()]
+    return cleaned[:3]
+
+
+def _find_entry_index(entries: list[dict], entry_id: str) -> int:
+    for i, e in enumerate(entries):
+        if isinstance(e, dict) and e.get("id") == entry_id:
+            return i
+    return -1
 
 @app.get("/api/v1/journal")
 def list_journal(
@@ -687,6 +716,95 @@ def get_journal_entry(entry_id: str):
         if e.get("id") == entry_id:
             return e
     raise HTTPException(status_code=404, detail="entry not found")
+
+@app.patch("/api/v1/journal/{entry_id}")
+def patch_journal_entry(entry_id: str, payload: dict):
+    """
+    Updates only mutable fields.
+    Immutable: id, type, created_at, date/week_id, snapshot.
+    Daily: wins, miss, fix
+    Weekly: outcomes, constraint, decision, next_focus
+    """
+    global JOURNAL
+    JOURNAL = normalize_journal(JOURNAL)
+    entries = JOURNAL.get("entries", [])
+
+    idx = _find_entry_index(entries, entry_id)
+    if idx == -1:
+        raise HTTPException(status_code=404, detail="entry not found")
+
+    entry = entries[idx]
+    etype = entry.get("type")
+
+    # Defensive: enforce dict payload
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="payload must be an object")
+
+    if etype == "daily":
+        # Validate via pydantic
+        patch = DailyCloseoutPatch(**payload)
+
+        if patch.wins is not None:
+            entry["wins"] = _clean_wins(patch.wins)
+
+        if patch.miss is not None:
+            entry["miss"] = str(patch.miss).strip()
+
+        if patch.fix is not None:
+            entry["fix"] = str(patch.fix).strip()
+
+    elif etype == "weekly":
+        patch = WeeklyReviewPatch(**payload)
+
+        if patch.outcomes is not None:
+            norm_outcomes = []
+            for o in patch.outcomes:
+                norm_outcomes.append(
+                    {
+                        "id": str(o.id),
+                        "achieved": bool(o.achieved),
+                        "note": str(o.note or "").strip(),
+                    }
+                )
+            entry["outcomes"] = norm_outcomes
+
+        if patch.constraint is not None:
+            entry["constraint"] = str(patch.constraint).strip()
+
+        if patch.decision is not None:
+            entry["decision"] = str(patch.decision).strip()
+
+        if patch.next_focus is not None:
+            entry["next_focus"] = str(patch.next_focus).strip()
+
+    else:
+        raise HTTPException(status_code=400, detail="unsupported entry type")
+
+    # Persist
+    entries[idx] = entry
+    JOURNAL["entries"] = entries
+    save_json(JOURNAL_PATH, JOURNAL)
+    return entry
+
+
+@app.delete("/api/v1/journal/{entry_id}")
+def delete_journal_entry(entry_id: str):
+    """
+    Deletes an entry permanently (MVP).
+    """
+    global JOURNAL
+    JOURNAL = normalize_journal(JOURNAL)
+    entries = JOURNAL.get("entries", [])
+
+    idx = _find_entry_index(entries, entry_id)
+    if idx == -1:
+        raise HTTPException(status_code=404, detail="entry not found")
+
+    deleted = entries.pop(idx)
+    JOURNAL["entries"] = entries
+    save_json(JOURNAL_PATH, JOURNAL)
+
+    return {"ok": True, "deleted_id": entry_id, "deleted_type": deleted.get("type")}
 
 
 # -------------------------------------------------------------------

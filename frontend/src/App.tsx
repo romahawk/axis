@@ -1,13 +1,17 @@
+// frontend/src/App.tsx
 import { useState } from "react";
-import { BookOpen, Cpu, CircleDot } from "lucide-react";
+import { BookOpen, Cpu, CircleDot, ClipboardCheck } from "lucide-react";
 
 import { useMe } from "./hooks/useMe";
 import DashboardPage from "./pages/DashboardPage";
 import { AxisGuideDrawer } from "./components/axis-guide/AxisGuideDrawer";
+import { ReviewDrawer } from "./components/review/ReviewDrawer";
 
 export default function App() {
   const { data: me, isLoading, isError } = useMe();
+
   const [guideOpen, setGuideOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -28,6 +32,17 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setReviewOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-800/70 bg-slate-950/40 px-3 py-1.5 text-xs text-slate-200 shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset] hover:bg-slate-950/60"
+              aria-label="Open Review"
+              title="Review"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5 text-slate-300" />
+              Review
+            </button>
+
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
@@ -58,6 +73,7 @@ export default function App() {
       </main>
 
       <AxisGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <ReviewDrawer open={reviewOpen} onClose={() => setReviewOpen(false)} />
     </div>
   );
 }

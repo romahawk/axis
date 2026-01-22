@@ -1,4 +1,3 @@
-// frontend/src/features/dashboard/todayTop3/TodayTop3Panel.tsx
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -18,6 +17,7 @@ type ToggleToday = {
 };
 
 const HIDE_CHECKED_KEY = "axis_today_hide_checked_v1";
+const EOD_ENABLED_KEY = "axis_today_eod_enabled_v1";
 
 function clamp3(items: TodayTop3Item[]) {
   return (items ?? []).slice(0, 3);
@@ -36,13 +36,16 @@ export function TodayTop3Panel(props: {
     false
   );
 
+  // ✅ Manual EOD toggle (persisted)
+  const [eodEnabled, setEodEnabled] = useLocalStorageJson<boolean>(
+    EOD_ENABLED_KEY,
+    false
+  );
+
   const items = clamp3(props.todayTop3);
   const doneCount = items.filter((i) => Boolean(i.done)).length;
   const pct = Math.round((doneCount / 3) * 100);
   const isCompleted = doneCount === 3;
-
-  const now = new Date();
-  const isEndOfDay = now.getHours() >= 18;
 
   const {
     editMode,
@@ -79,7 +82,9 @@ export function TodayTop3Panel(props: {
   return (
     <Panel
       title={`Today — Top 3 (${props.date})`}
-      className={`axis-tone axis-tone-today ${isCompleted ? "border-emerald-900/60" : ""}`}
+      className={`axis-tone axis-tone-today ${
+        isCompleted ? "border-emerald-900/60" : ""
+      }`}
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -102,7 +107,7 @@ export function TodayTop3Panel(props: {
               <span className="rounded-full border border-emerald-900/60 bg-emerald-950/30 px-2 py-0.5 text-xs text-emerald-200">
                 Day completed
               </span>
-            ) : isEndOfDay ? (
+            ) : eodEnabled ? (
               <span className="rounded-full border border-amber-900/50 bg-amber-950/20 px-2 py-0.5 text-xs text-amber-200">
                 EOD
               </span>
@@ -116,6 +121,22 @@ export function TodayTop3Panel(props: {
             <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
               EXECUTE
             </span>
+
+            {/* ✅ Manual EOD toggle */}
+            <button
+              type="button"
+              className={[
+                "rounded-md border px-2 py-1 text-xs hover:text-white",
+                eodEnabled
+                  ? "border-amber-900/50 bg-amber-950/10 text-amber-200"
+                  : "border-slate-800 text-slate-300",
+              ].join(" ")}
+              onClick={() => setEodEnabled(!eodEnabled)}
+              title="Toggle end-of-day mode"
+            >
+              {eodEnabled ? "EOD: On" : "EOD: Off"}
+            </button>
+
             <button
               className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
               onClick={startEdit}
@@ -146,8 +167,8 @@ export function TodayTop3Panel(props: {
         )}
       </div>
 
-      {/* Soft EOD signal */}
-      {!editMode && isEndOfDay && !isCompleted && (
+      {/* ✅ Manual EOD signal */}
+      {!editMode && eodEnabled && !isCompleted && (
         <div className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/10 p-2 text-xs text-amber-200">
           End-of-day check: finish one item or consciously park it.
         </div>
