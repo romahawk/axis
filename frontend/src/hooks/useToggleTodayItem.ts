@@ -1,38 +1,40 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-type TogglePayload = {
-  kind: "outcomes" | "actions";
-  id: string;
-  done: boolean;
-};
+function apiBase(): string {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+  return (base ?? "").replace(/\/$/, "");
+}
 
-type TodayItem = {
-  id: string;
-  text: string;
-  done?: boolean;
-};
+function toApiUrl(path: string) {
+  if (!path.startsWith("/")) path = `/${path}`;
+  const base = apiBase();
+  return base ? `${base}${path}` : path;
+}
 
 export function useToggleTodayItem() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ kind, id, done }: TogglePayload): Promise<TodayItem> => {
-      const res = await fetch(`/api/v1/views/today/${kind}/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ done }),
-      });
+    mutationFn: async (itemId: string) => {
+      const res = await fetch(
+        toApiUrl(`/api/v1/views/today/top3/${itemId}`),
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
 
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(`Toggle failed: ${res.status} ${txt}`);
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Failed to toggle today item");
       }
 
       return res.json();
     },
+
     onSuccess: async () => {
-      // Dashboard reads Today Top 3 → refresh it
       await qc.invalidateQueries({ queryKey: ["dashboard"] });
+      await qc.invalidateQueries({ queryKey: ["today"] });
     },
   });
 }

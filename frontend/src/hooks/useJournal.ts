@@ -7,14 +7,31 @@ export type JournalEntry = {
   created_at: string;
   date?: string;
   week_id?: string;
-
   wins?: string[];
   miss?: string;
   fix?: string;
-
-  // keep it loose for MVP
   snapshot?: any;
 };
+
+function apiBase(): string {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+  return (base ?? "").replace(/\/$/, "");
+}
+
+function toApiUrl(path: string) {
+  if (!path.startsWith("/")) path = `/${path}`;
+  const base = apiBase();
+  return base ? `${base}${path}` : path;
+}
+
+async function getJSON<T>(url: string): Promise<T> {
+  const res = await fetch(toApiUrl(url), { credentials: "include" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `GET ${url} failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
 
 export function useJournalList(params?: { limit?: number; type?: "daily" | "weekly" }) {
   const limit = params?.limit ?? 50;
@@ -26,16 +43,7 @@ export function useJournalList(params?: { limit?: number; type?: "daily" | "week
 
   return useQuery({
     queryKey: ["journal", { limit, type }],
-    queryFn: async () => {
-      const res = await fetch(`/api/v1/journal?${qs.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `GET /api/v1/journal failed (${res.status})`);
-      }
-      return (await res.json()) as { entries: JournalEntry[] };
-    },
+    queryFn: async () => getJSON<{ entries: JournalEntry[] }>(`/api/v1/journal?${qs.toString()}`),
   });
 }
 
@@ -47,7 +55,6 @@ export function useCreateDailyCloseout() {
       return await postJSON<JournalEntry>("/api/v1/journal/daily", payload);
     },
     onSuccess: async () => {
-      // refresh any journal lists
       await qc.invalidateQueries({ queryKey: ["journal"] });
     },
   });
