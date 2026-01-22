@@ -604,25 +604,6 @@ class WeeklyReviewIn(BaseModel):
     next_focus: str = ""
 
 
-class DailyCloseoutPatch(BaseModel):
-    wins: Optional[list[str]] = None
-    miss: Optional[str] = None
-    fix: Optional[str] = None
-
-
-class WeeklyOutcomeResultPatch(BaseModel):
-    id: str
-    achieved: Optional[bool] = None
-    note: Optional[str] = None
-
-
-class WeeklyReviewPatch(BaseModel):
-    outcomes: Optional[list[WeeklyOutcomeResultPatch]] = None
-    constraint: Optional[str] = None
-    decision: Optional[str] = None
-    next_focus: Optional[str] = None
-
-
 def _append_journal_entry(entry: dict) -> dict:
     global JOURNAL
     JOURNAL = normalize_journal(JOURNAL)
