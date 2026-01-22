@@ -11,22 +11,28 @@ function toApiUrl(path: string) {
   return base ? `${base}${path}` : path;
 }
 
+type ToggleArgs = {
+  kind: "outcomes" | "actions"; // UI contract; we use "outcomes" for Top3
+  id: string;
+  done: boolean;
+};
+
 export function useToggleTodayItem() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (itemId: string) => {
-      const res = await fetch(
-        toApiUrl(`/api/v1/views/today/top3/${itemId}`),
-        {
-          method: "POST",
-          credentials: "include",
-        }
-      );
+    mutationFn: async (args: ToggleArgs) => {
+      // Canonical endpoint (v1)
+      const res = await fetch(toApiUrl(`/api/v1/today/top3/${args.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ done: args.done }),
+      });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(text || "Failed to toggle today item");
+        throw new Error(text || `Failed to toggle item ${args.id}`);
       }
 
       return res.json();
