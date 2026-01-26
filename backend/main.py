@@ -18,6 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "https://axis-personal.vercel.app",
         "https://axis-dev.vercel.app",
     ],
@@ -602,6 +603,19 @@ class WeeklyReviewIn(BaseModel):
     constraint: str = ""
     decision: str = ""
     next_focus: str = ""
+
+
+class DailyCloseoutPatch(BaseModel):
+    wins: Optional[list[str]] = None
+    miss: Optional[str] = None
+    fix: Optional[str] = None
+
+
+class WeeklyReviewPatch(BaseModel):
+    outcomes: Optional[list[WeeklyOutcomeResultIn]] = None
+    constraint: Optional[str] = None
+    decision: Optional[str] = None
+    next_focus: Optional[str] = None
 
 
 def _append_journal_entry(entry: dict) -> dict:
