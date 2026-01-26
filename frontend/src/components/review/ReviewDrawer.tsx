@@ -53,12 +53,6 @@ function fmt(ts?: string) {
   return `${yyyy}-${mm}-${dd}, ${hh}:${mi}`;
 }
 
-function joinWinsForTextarea(wins?: string[]) {
-  return (wins ?? []).slice(0, 3).join("\n");
-}
-
-type WeeklyOutcomeDraft = { id: "w1" | "w2" | "w3"; achieved: boolean; note: string };
-
 export function ReviewDrawer({ open, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -92,9 +86,27 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
   // Edit modal state
   const [editId, setEditId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<"daily" | "weekly">("daily");
+
+  // daily draft
   const [editWinsText, setEditWinsText] = useState("");
   const [editMiss, setEditMiss] = useState("");
   const [editFix, setEditFix] = useState("");
+
+  // weekly draft ✅ NEW
+  type WeeklyOutcomeDraft = { id: string; achieved: boolean; note: string };
+
+  const [editWeeklyOutcomes, setEditWeeklyOutcomes] = useState<
+    WeeklyOutcomeDraft[]
+  >([
+    { id: "w1", achieved: false, note: "" },
+    { id: "w2", achieved: false, note: "" },
+    { id: "w3", achieved: false, note: "" },
+  ]);
+
+  const [editWeeklyConstraint, setEditWeeklyConstraint] = useState("");
+  const [editWeeklyDecision, setEditWeeklyDecision] = useState("");
+  const [editWeeklyNextFocus, setEditWeeklyNextFocus] = useState("");
 
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -183,21 +195,72 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
   function openEdit(entry: JournalEntry) {
     setEditId(entry.id);
-    setEditWinsText(joinWinsForTextarea(entry.wins));
-    setEditMiss(entry.miss ?? "");
-    setEditFix(entry.fix ?? "");
+    setEditType(entry.type);
+
+    if (entry.type === "daily") {
+      setEditWinsText((entry.wins ?? []).slice(0, 3).join("\n"));
+      setEditMiss(entry.miss ?? "");
+      setEditFix(entry.fix ?? "");
+      return;
+    }
+
+    // weekly ✅
+    setEditWeeklyOutcomes(
+      (
+        entry.outcomes ?? [
+          { id: "w1", achieved: false, note: "" },
+          { id: "w2", achieved: false, note: "" },
+          { id: "w3", achieved: false, note: "" },
+        ]
+      ).map((o) => ({
+        id: o.id,
+        achieved: !!o.achieved,
+        note: (o.note ?? "").toString(),
+      })),
+    );
+
+    setEditWeeklyConstraint(entry.constraint ?? "");
+    setEditWeeklyDecision(entry.decision ?? "");
+    setEditWeeklyNextFocus(entry.next_focus ?? "");
   }
 
   function saveEditLocal() {
     if (!editId) return;
 
-    const wins = splitLinesMax3(editWinsText);
-    const miss2 = editMiss.trim();
-    const fix2 = editFix.trim();
+    if (editType === "daily") {
+      const wins = editWinsText
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+
+      const miss2 = editMiss.trim();
+      const fix2 = editFix.trim();
+
+      setLocalEdits((prev) => ({
+        ...prev,
+        [editId]: { wins, miss: miss2, fix: fix2 },
+      }));
+
+      setEditId(null);
+      return;
+    }
+
+    // weekly ✅
+    const outcomes = (editWeeklyOutcomes ?? []).map((o) => ({
+      id: o.id,
+      achieved: !!o.achieved,
+      note: (o.note ?? "").trim(),
+    }));
 
     setLocalEdits((prev) => ({
       ...prev,
-      [editId]: { wins, miss: miss2, fix: fix2 },
+      [editId]: {
+        outcomes,
+        constraint: editWeeklyConstraint.trim(),
+        decision: editWeeklyDecision.trim(),
+        next_focus: editWeeklyNextFocus.trim(),
+      },
     }));
 
     setEditId(null);
@@ -340,7 +403,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-300">Miss (1 line)</div>
+                    <div className="mb-1 text-xs text-slate-300">
+                      Miss (1 line)
+                    </div>
                     <input
                       className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
                       value={miss}
@@ -363,7 +428,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
                   {createDaily.isError && (
                     <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-3 text-xs text-red-200">
-                      {String((createDaily.error as any)?.message ?? "Failed to save")}
+                      {String(
+                        (createDaily.error as any)?.message ?? "Failed to save",
+                      )}
                     </div>
                   )}
 
@@ -382,7 +449,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                         "bg-indigo-950/25 hover:bg-indigo-900/25",
                         "text-indigo-100",
                         "shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset]",
-                        createDaily.isPending ? "opacity-60 cursor-not-allowed" : "",
+                        createDaily.isPending
+                          ? "opacity-60 cursor-not-allowed"
+                          : "",
                       ].join(" ")}
                     >
                       {createDaily.isSuccess ? (
@@ -406,7 +475,8 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   Weekly Review (10 min)
                 </div>
                 <div className="mt-1 text-sm text-slate-200">
-                  Decide what worked, what blocked you, and what changes next week.
+                  Decide what worked, what blocked you, and what changes next
+                  week.
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -456,7 +526,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   ))}
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-300">Biggest constraint</div>
+                    <div className="mb-1 text-xs text-slate-300">
+                      Biggest constraint
+                    </div>
                     <input
                       className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
                       value={weeklyConstraint}
@@ -466,7 +538,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-300">One decision</div>
+                    <div className="mb-1 text-xs text-slate-300">
+                      One decision
+                    </div>
                     <input
                       className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
                       value={weeklyDecision}
@@ -476,7 +550,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-300">Next week focus</div>
+                    <div className="mb-1 text-xs text-slate-300">
+                      Next week focus
+                    </div>
                     <input
                       className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
                       value={weeklyNextFocus}
@@ -487,7 +563,10 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
                   {createWeekly.isError && (
                     <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-3 text-xs text-red-200">
-                      {String((createWeekly.error as any)?.message ?? "Failed to save")}
+                      {String(
+                        (createWeekly.error as any)?.message ??
+                          "Failed to save",
+                      )}
                     </div>
                   )}
 
@@ -506,7 +585,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                         "bg-indigo-950/25 hover:bg-indigo-900/25",
                         "text-indigo-100",
                         "shadow-[0_0_0_1px_rgba(99,102,241,0.10)_inset]",
-                        createWeekly.isPending ? "opacity-60 cursor-not-allowed" : "",
+                        createWeekly.isPending
+                          ? "opacity-60 cursor-not-allowed"
+                          : "",
                       ].join(" ")}
                     >
                       <ClipboardCheck className="h-4 w-4 text-indigo-200/90" />
@@ -526,7 +607,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
                     Journal Timeline
                   </div>
-                  <div className="text-sm text-slate-300">Latest entries (newest first)</div>
+                  <div className="text-sm text-slate-300">
+                    Latest entries (newest first)
+                  </div>
 
                   {hasLocalChanges && (
                     <div className="mt-2 text-xs text-amber-200">
@@ -601,22 +684,23 @@ export function ReviewDrawer({ open, onClose }: Props) {
                             <div className="mt-2 text-sm text-slate-200">
                               {e.type === "daily"
                                 ? (e.wins?.[0] ?? e.miss ?? e.fix ?? "—")
-                                : (e.next_focus ?? e.decision ?? e.constraint ?? "—")}
+                                : (e.next_focus ??
+                                  e.decision ??
+                                  e.constraint ??
+                                  "—")}
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {e.type === "daily" && (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
-                                title="Edit entry (local-only for now)"
-                                onClick={() => openEdit(e)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Edit
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
+                              title="Edit entry (local-only for now)"
+                              onClick={() => openEdit(e)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
 
                             <button
                               type="button"
@@ -640,12 +724,14 @@ export function ReviewDrawer({ open, onClose }: Props) {
                             ) : null}
                             {e.miss ? (
                               <div>
-                                <span className="text-slate-300">Miss:</span> {e.miss}
+                                <span className="text-slate-300">Miss:</span>{" "}
+                                {e.miss}
                               </div>
                             ) : null}
                             {e.fix ? (
                               <div>
-                                <span className="text-slate-300">Fix:</span> {e.fix}
+                                <span className="text-slate-300">Fix:</span>{" "}
+                                {e.fix}
                               </div>
                             ) : null}
                           </div>
@@ -655,19 +741,25 @@ export function ReviewDrawer({ open, onClose }: Props) {
                           <div className="mt-3 space-y-1 text-xs text-slate-400">
                             {e.constraint ? (
                               <div>
-                                <span className="text-slate-300">Constraint:</span>{" "}
+                                <span className="text-slate-300">
+                                  Constraint:
+                                </span>{" "}
                                 {e.constraint}
                               </div>
                             ) : null}
                             {e.decision ? (
                               <div>
-                                <span className="text-slate-300">Decision:</span>{" "}
+                                <span className="text-slate-300">
+                                  Decision:
+                                </span>{" "}
                                 {e.decision}
                               </div>
                             ) : null}
                             {e.next_focus ? (
                               <div>
-                                <span className="text-slate-300">Next focus:</span>{" "}
+                                <span className="text-slate-300">
+                                  Next focus:
+                                </span>{" "}
                                 {e.next_focus}
                               </div>
                             ) : null}
@@ -678,7 +770,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   })}
 
                   {!mergedEntries.length && (
-                    <div className="text-sm text-slate-500">No entries yet.</div>
+                    <div className="text-sm text-slate-500">
+                      No entries yet.
+                    </div>
                   )}
                 </div>
               )}
@@ -695,13 +789,19 @@ export function ReviewDrawer({ open, onClose }: Props) {
         {/* Edit / Delete modals (kept as-is) */}
         {editId && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70" onClick={() => setEditId(null)} />
+            <div
+              className="absolute inset-0 bg-black/70"
+              onClick={() => setEditId(null)}
+            />
             <div className="relative w-full max-w-lg rounded-2xl border border-slate-800/70 bg-slate-950 p-4 shadow-2xl">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-                    Edit Daily Entry
+                    {editType === "daily"
+                      ? "Edit Daily Entry"
+                      : "Edit Weekly Entry"}
                   </div>
+
                   <div className="text-xs text-amber-200 mt-1">
                     Local-only for now. Timestamp stays immutable.
                   </div>
@@ -715,32 +815,125 @@ export function ReviewDrawer({ open, onClose }: Props) {
               </div>
 
               <div className="mt-4 space-y-3">
-                <div>
-                  <div className="mb-1 text-xs text-slate-300">Wins (max 3, one per line)</div>
-                  <textarea
-                    className="w-full min-h-[84px] resize-none rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
-                    value={editWinsText}
-                    onChange={(e) => setEditWinsText(e.target.value)}
-                  />
-                </div>
+                {editType === "daily" ? (
+                  <>
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">
+                        Wins (max 3, one per line)
+                      </div>
+                      <textarea
+                        className="w-full min-h-[84px] resize-none rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editWinsText}
+                        onChange={(e) => setEditWinsText(e.target.value)}
+                      />
+                    </div>
 
-                <div>
-                  <div className="mb-1 text-xs text-slate-300">Miss</div>
-                  <input
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
-                    value={editMiss}
-                    onChange={(e) => setEditMiss(e.target.value)}
-                  />
-                </div>
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">Miss</div>
+                      <input
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editMiss}
+                        onChange={(e) => setEditMiss(e.target.value)}
+                      />
+                    </div>
 
-                <div>
-                  <div className="mb-1 text-xs text-slate-300">Fix</div>
-                  <input
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
-                    value={editFix}
-                    onChange={(e) => setEditFix(e.target.value)}
-                  />
-                </div>
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">Fix</div>
+                      <input
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editFix}
+                        onChange={(e) => setEditFix(e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs text-slate-300">
+                      Outcomes (editable)
+                    </div>
+
+                    {editWeeklyOutcomes.map((o, idx) => (
+                      <div
+                        key={o.id}
+                        className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-slate-300 uppercase tracking-widest">
+                            {o.id}
+                          </div>
+
+                          <label className="flex items-center gap-2 text-xs text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={o.achieved}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setEditWeeklyOutcomes((prev) => {
+                                  const next = [...prev];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    achieved: checked,
+                                  };
+                                  return next;
+                                });
+                              }}
+                            />
+                            Achieved
+                          </label>
+                        </div>
+
+                        <input
+                          className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                          value={o.note}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setEditWeeklyOutcomes((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], note: v };
+                              return next;
+                            });
+                          }}
+                          placeholder="Optional note"
+                        />
+                      </div>
+                    ))}
+
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">
+                        Biggest constraint
+                      </div>
+                      <input
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editWeeklyConstraint}
+                        onChange={(e) =>
+                          setEditWeeklyConstraint(e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">
+                        One decision
+                      </div>
+                      <input
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editWeeklyDecision}
+                        onChange={(e) => setEditWeeklyDecision(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-xs text-slate-300">
+                        Next week focus
+                      </div>
+                      <input
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                        value={editWeeklyNextFocus}
+                        onChange={(e) => setEditWeeklyNextFocus(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
@@ -763,14 +956,19 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
         {deleteId && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70" onClick={() => setDeleteId(null)} />
+            <div
+              className="absolute inset-0 bg-black/70"
+              onClick={() => setDeleteId(null)}
+            />
             <div className="relative w-full max-w-md rounded-2xl border border-slate-800/70 bg-slate-950 p-4 shadow-2xl">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-xl border border-amber-900/40 bg-amber-950/10">
                   <AlertTriangle className="h-4 w-4 text-amber-200" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-100">Delete entry?</div>
+                  <div className="text-sm font-semibold text-slate-100">
+                    Delete entry?
+                  </div>
                   <div className="mt-1 text-xs text-amber-200">
                     Local-only for now. Backend delete comes next.
                   </div>
@@ -796,6 +994,6 @@ export function ReviewDrawer({ open, onClose }: Props) {
         )}
       </div>
     </div>,
-    portalTarget
+    portalTarget,
   );
 }
