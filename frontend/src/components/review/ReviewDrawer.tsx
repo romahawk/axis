@@ -53,12 +53,6 @@ function fmt(ts?: string) {
   return `${yyyy}-${mm}-${dd}, ${hh}:${mi}`;
 }
 
-function joinWinsForTextarea(wins?: string[]) {
-  return (wins ?? []).slice(0, 3).join("\n");
-}
-
-type WeeklyOutcomeDraft = { id: "w1" | "w2" | "w3"; achieved: boolean; note: string };
-
 export function ReviewDrawer({ open, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
