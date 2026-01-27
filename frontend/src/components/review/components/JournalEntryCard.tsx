@@ -1,18 +1,17 @@
-// src/features/review/components/JournalEntryCard.tsx
 import { Pencil, Trash2 } from "lucide-react";
 import type { JournalEntry } from "../../../hooks/useJournal";
 import { fmt } from "../state/useReviewState";
 
 export function JournalEntryCard({
   entry,
-  isLocallyEdited,
   onEdit,
   onDelete,
+  isBusy,
 }: {
   entry: JournalEntry;
-  isLocallyEdited: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  isBusy?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-800/60 bg-slate-950/20 p-4">
@@ -30,12 +29,6 @@ export function JournalEntryCard({
               {entry.type}
             </span>
 
-            {isLocallyEdited && (
-              <span className="rounded-full border border-amber-900/40 bg-amber-950/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-amber-200">
-                local
-              </span>
-            )}
-
             <div className="text-xs text-slate-400 truncate">
               {fmt(entry.created_at)}
             </div>
@@ -51,8 +44,12 @@ export function JournalEntryCard({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
-            title="Edit entry (local-only for now)"
+            disabled={isBusy}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white",
+              isBusy ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
+            title="Edit entry"
             onClick={onEdit}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -61,8 +58,12 @@ export function JournalEntryCard({
 
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white"
-            title="Delete entry (local-only for now)"
+            disabled={isBusy}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-950/30 px-2.5 py-1 text-xs text-slate-300 hover:text-white",
+              isBusy ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
+            title="Delete entry"
             onClick={onDelete}
           >
             <Trash2 className="h-3.5 w-3.5" />

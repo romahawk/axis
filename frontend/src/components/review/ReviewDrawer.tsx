@@ -1,15 +1,20 @@
-// src/features/review/components/ReviewDrawer.tsx
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ClipboardCheck, X } from "lucide-react";
 
-import { useJournalList, type JournalEntry } from "../../hooks/useJournal";
+import {
+  useDeleteJournalEntry,
+  useJournalList,
+  useUpdateJournalEntry,
+  type JournalEntry,
+} from "../../hooks/useJournal";
+
 import { DailyReviewForm } from "./components/DailyReviewForm";
 import { WeeklyReviewForm } from "./components/WeeklyReviewForm";
 import { JournalTimeline } from "./components/JournalTimeline";
 import { EditEntryModal } from "./components/EditEntryModal";
 import { useLockBodyScroll } from "./state/useReviewState";
-import { useReviewState } from "./state/useReviewState";
+import { splitLinesMax3, useReviewState } from "./state/useReviewState";
 
 type Props = {
   open: boolean;
@@ -22,6 +27,11 @@ export function ReviewDrawer({ open, onClose }: Props) {
   const s = useReviewState(open);
   const journal = useJournalList({ limit: 50 });
 
+  const updateEntry = useUpdateJournalEntry();
+  const deleteEntry = useDeleteJournalEntry();
+
+  const isBusy = updateEntry.isPending || deleteEntry.isPending;
+
   // ESC closes
   useEffect(() => {
     if (!open) return;
@@ -33,14 +43,12 @@ export function ReviewDrawer({ open, onClose }: Props) {
   }, [open, onClose]);
 
   const portalTarget = s.portalTarget;
+
+  // ✅ not a hook, safe before early return
+  const entries: JournalEntry[] = journal.data?.entries ?? [];
+
+  // ✅ early return is now safe because no hooks appear below it
   if (!portalTarget) return null;
-
-  const baseEntries = journal.data?.entries ?? [];
-  const mergedEntries: JournalEntry[] = baseEntries
-    .map((e) => ({ ...e, ...(s.localEdits[e.id] ?? {}) }))
-    .filter((e) => !s.localDeleted.has(e.id));
-
-  const localEditedIds = new Set(Object.keys(s.localEdits));
 
   const Tabs = (
     <div className="flex items-center gap-2">
@@ -65,6 +73,49 @@ export function ReviewDrawer({ open, onClose }: Props) {
       ))}
     </div>
   );
+
+  async function handleSaveEdit() {
+    if (!s.editId) return;
+
+    if (s.editType === "daily") {
+      const wins = splitLinesMax3(s.editWinsText);
+      const miss = s.editMiss.trim();
+      const fix = s.editFix.trim();
+
+      await updateEntry.mutateAsync({
+        id: s.editId,
+        payload: { type: "daily", wins, miss, fix },
+      });
+
+      s.setEditId(null);
+      return;
+    }
+
+    const outcomes = (s.editWeeklyOutcomes ?? []).map((o) => ({
+      id: o.id,
+      achieved: !!o.achieved,
+      note: (o.note ?? "").trim(),
+    }));
+
+    await updateEntry.mutateAsync({
+      id: s.editId,
+      payload: {
+        type: "weekly",
+        outcomes,
+        constraint: s.editWeeklyConstraint.trim(),
+        decision: s.editWeeklyDecision.trim(),
+        next_focus: s.editWeeklyNextFocus.trim(),
+      },
+    });
+
+    s.setEditId(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!s.deleteId) return;
+    await deleteEntry.mutateAsync(s.deleteId);
+    s.setDeleteId(null);
+  }
 
   return createPortal(
     <div
@@ -152,26 +203,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   <div className="text-sm text-slate-300">
                     Latest entries (newest first)
                   </div>
-
-                  {s.hasLocalChanges && (
-                    <div className="mt-2 text-xs text-amber-200">
-                      You have LOCAL edits/deletes (not saved to backend yet).
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {s.hasLocalChanges && (
-                    <button
-                      type="button"
-                      onClick={s.resetLocalChanges}
-                      className="rounded-lg border border-amber-900/40 bg-amber-950/10 px-3 py-1.5 text-xs text-amber-200 hover:text-white"
-                      title="Discard local changes"
-                    >
-                      Reset local
-                    </button>
-                  )}
-
                   <button
                     type="button"
                     onClick={() => journal.refetch()}
@@ -191,14 +225,24 @@ export function ReviewDrawer({ open, onClose }: Props) {
               ) : (
                 <>
                   <JournalTimeline
-                    entries={mergedEntries}
-                    localEditedIds={localEditedIds}
+                    entries={entries}
+                    isBusy={isBusy}
                     onEdit={s.openEdit}
                     onDelete={(id) => s.setDeleteId(id)}
                   />
 
-                  {!mergedEntries.length && (
+                  {!entries.length && (
                     <div className="text-sm text-slate-500">No entries yet.</div>
+                  )}
+
+                  {(updateEntry.isError || deleteEntry.isError) && (
+                    <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-3 text-xs text-red-200">
+                      {String(
+                        (updateEntry.error as any)?.message ??
+                          (deleteEntry.error as any)?.message ??
+                          "Operation failed",
+                      )}
+                    </div>
                   )}
                 </>
               )}
@@ -216,8 +260,9 @@ export function ReviewDrawer({ open, onClose }: Props) {
         {s.editId && (
           <EditEntryModal
             type={s.editType}
+            isSaving={updateEntry.isPending}
             onClose={() => s.setEditId(null)}
-            onSave={s.saveEditLocal}
+            onSave={handleSaveEdit}
             editWinsText={s.editWinsText}
             setEditWinsText={s.setEditWinsText}
             editMiss={s.editMiss}
@@ -240,7 +285,7 @@ export function ReviewDrawer({ open, onClose }: Props) {
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div
               className="absolute inset-0 bg-black/70"
-              onClick={() => s.setDeleteId(null)}
+              onClick={() => (isBusy ? null : s.setDeleteId(null))}
             />
             <div className="relative w-full max-w-md rounded-2xl border border-slate-800/70 bg-slate-950 p-4 shadow-2xl">
               <div className="flex items-start gap-3">
@@ -251,24 +296,26 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   <div className="text-sm font-semibold text-slate-100">
                     Delete entry?
                   </div>
-                  <div className="mt-1 text-xs text-amber-200">
-                    Local-only for now. Backend delete comes next.
+                  <div className="mt-1 text-xs text-slate-400">
+                    This will permanently delete the entry.
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 flex justify-end gap-2">
                 <button
-                  className="rounded-xl border border-slate-800 px-3 py-2 text-xs text-slate-300 hover:text-white"
+                  disabled={isBusy}
+                  className="rounded-xl border border-slate-800 px-3 py-2 text-xs text-slate-300 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={() => s.setDeleteId(null)}
                 >
                   Cancel
                 </button>
                 <button
-                  className="rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200 hover:text-white"
-                  onClick={s.confirmDeleteLocal}
+                  disabled={isBusy}
+                  className="rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  onClick={handleConfirmDelete}
                 >
-                  Delete
+                  {deleteEntry.isPending ? "Deleting…" : "Delete"}
                 </button>
               </div>
             </div>

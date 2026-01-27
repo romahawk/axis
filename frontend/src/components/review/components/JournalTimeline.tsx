@@ -1,17 +1,16 @@
-// src/features/review/components/JournalTimeline.tsx
 import type { JournalEntry } from "../../../hooks/useJournal";
 import { JournalEntryCard } from "./JournalEntryCard";
 
 export function JournalTimeline({
   entries,
-  localEditedIds,
   onEdit,
   onDelete,
+  isBusy,
 }: {
   entries: JournalEntry[];
-  localEditedIds: Set<string>;
   onEdit: (entry: JournalEntry) => void;
   onDelete: (id: string) => void;
+  isBusy?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -19,7 +18,7 @@ export function JournalTimeline({
         <JournalEntryCard
           key={entry.id}
           entry={entry}
-          isLocallyEdited={localEditedIds.has(entry.id)}
+          isBusy={isBusy}
           onEdit={() => onEdit(entry)}
           onDelete={() => onDelete(entry.id)}
         />

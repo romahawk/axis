@@ -7,12 +7,13 @@ export type JournalEntry = {
   created_at: string;
   date?: string;
   week_id?: string;
-    // daily
+
+  // daily
   wins?: string[];
   miss?: string;
   fix?: string;
 
-  // weekly 
+  // weekly
   outcomes?: { id: string; achieved: boolean; note?: string }[];
   constraint?: string;
   decision?: string;
@@ -20,6 +21,21 @@ export type JournalEntry = {
 
   snapshot?: any;
 };
+
+export type UpdateJournalEntryPayload =
+  | {
+      type: "daily";
+      wins: string[];
+      miss: string;
+      fix: string;
+    }
+  | {
+      type: "weekly";
+      outcomes: { id: string; achieved: boolean; note: string }[];
+      constraint: string;
+      decision: string;
+      next_focus: string;
+    };
 
 function apiBase(): string {
   const base = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
@@ -32,13 +48,34 @@ function toApiUrl(path: string) {
   return base ? `${base}${path}` : path;
 }
 
-async function getJSON<T>(url: string): Promise<T> {
-  const res = await fetch(toApiUrl(url), { credentials: "include" });
+async function requestJSON<T>(
+  url: string,
+  init: RequestInit & { json?: any } = {},
+): Promise<T> {
+  const { json, ...rest } = init;
+
+  const res = await fetch(toApiUrl(url), {
+    credentials: "include",
+    headers: {
+      ...(json ? { "Content-Type": "application/json" } : {}),
+      ...(rest.headers ?? {}),
+    },
+    body: json ? JSON.stringify(json) : rest.body,
+    ...rest,
+  });
+
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `GET ${url} failed (${res.status})`);
+    throw new Error(text || `${rest.method ?? "GET"} ${url} failed (${res.status})`);
   }
+
+  // DELETE may return 204 with empty body
+  if (res.status === 204) return undefined as unknown as T;
   return (await res.json()) as T;
+}
+
+async function getJSON<T>(url: string): Promise<T> {
+  return requestJSON<T>(url, { method: "GET" });
 }
 
 export function useJournalList(params?: { limit?: number; type?: "daily" | "weekly" }) {
@@ -51,7 +88,8 @@ export function useJournalList(params?: { limit?: number; type?: "daily" | "week
 
   return useQuery({
     queryKey: ["journal", { limit, type }],
-    queryFn: async () => getJSON<{ entries: JournalEntry[] }>(`/api/v1/journal?${qs.toString()}`),
+    queryFn: async () =>
+      getJSON<{ entries: JournalEntry[] }>(`/api/v1/journal?${qs.toString()}`),
   });
 }
 
@@ -79,6 +117,35 @@ export function useCreateWeeklyReview() {
       next_focus: string;
     }) => {
       return await postJSON<JournalEntry>("/api/v1/journal/weekly", payload);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["journal"] });
+    },
+  });
+}
+
+export function useUpdateJournalEntry() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (args: { id: string; payload: UpdateJournalEntryPayload }) => {
+      return await requestJSON<JournalEntry>(`/api/v1/journal/${args.id}`, {
+        method: "PATCH",
+        json: args.payload,
+      });
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["journal"] });
+    },
+  });
+}
+
+export function useDeleteJournalEntry() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await requestJSON<void>(`/api/v1/journal/${id}`, { method: "DELETE" });
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["journal"] });
