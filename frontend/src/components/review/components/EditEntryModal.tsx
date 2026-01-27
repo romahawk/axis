@@ -1,4 +1,3 @@
-// src/features/review/components/EditEntryModal.tsx
 import { X } from "lucide-react";
 import type { WeeklyOutcomeDraft } from "../types";
 
@@ -6,6 +5,7 @@ export function EditEntryModal({
   type,
   onClose,
   onSave,
+  isSaving,
 
   // daily
   editWinsText,
@@ -28,6 +28,7 @@ export function EditEntryModal({
   type: "daily" | "weekly";
   onClose: () => void;
   onSave: () => void;
+  isSaving?: boolean;
 
   editWinsText: string;
   setEditWinsText: (v: string) => void;
@@ -55,12 +56,17 @@ export function EditEntryModal({
               {type === "daily" ? "Edit Daily Entry" : "Edit Weekly Entry"}
             </div>
 
-            <div className="text-xs text-amber-200 mt-1">
-              Local-only for now. Timestamp stays immutable.
+            <div className="text-xs text-slate-400 mt-1">
+              Changes are saved to Journal. Timestamp stays immutable.
             </div>
           </div>
+
           <button
-            className="rounded-lg border border-slate-800/70 bg-slate-950/30 p-2 text-slate-300 hover:text-white"
+            disabled={isSaving}
+            className={[
+              "rounded-lg border border-slate-800/70 bg-slate-950/30 p-2 text-slate-300 hover:text-white",
+              isSaving ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -75,7 +81,8 @@ export function EditEntryModal({
                   Wins (max 3, one per line)
                 </div>
                 <textarea
-                  className="w-full min-h-[84px] resize-none rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full min-h-[84px] resize-none rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editWinsText}
                   onChange={(e) => setEditWinsText(e.target.value)}
                 />
@@ -84,7 +91,8 @@ export function EditEntryModal({
               <div>
                 <div className="mb-1 text-xs text-slate-300">Miss</div>
                 <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editMiss}
                   onChange={(e) => setEditMiss(e.target.value)}
                 />
@@ -93,7 +101,8 @@ export function EditEntryModal({
               <div>
                 <div className="mb-1 text-xs text-slate-300">Fix</div>
                 <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editFix}
                   onChange={(e) => setEditFix(e.target.value)}
                 />
@@ -115,6 +124,7 @@ export function EditEntryModal({
 
                     <label className="flex items-center gap-2 text-xs text-slate-300">
                       <input
+                        disabled={isSaving}
                         type="checkbox"
                         checked={o.achieved}
                         onChange={(e) => {
@@ -131,7 +141,8 @@ export function EditEntryModal({
                   </div>
 
                   <input
-                    className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                    disabled={isSaving}
+                    className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                     value={o.note}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -149,7 +160,8 @@ export function EditEntryModal({
               <div>
                 <div className="mb-1 text-xs text-slate-300">Biggest constraint</div>
                 <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editWeeklyConstraint}
                   onChange={(e) => setEditWeeklyConstraint(e.target.value)}
                 />
@@ -158,7 +170,8 @@ export function EditEntryModal({
               <div>
                 <div className="mb-1 text-xs text-slate-300">One decision</div>
                 <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editWeeklyDecision}
                   onChange={(e) => setEditWeeklyDecision(e.target.value)}
                 />
@@ -167,7 +180,8 @@ export function EditEntryModal({
               <div>
                 <div className="mb-1 text-xs text-slate-300">Next week focus</div>
                 <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600 disabled:opacity-60"
                   value={editWeeklyNextFocus}
                   onChange={(e) => setEditWeeklyNextFocus(e.target.value)}
                 />
@@ -177,16 +191,18 @@ export function EditEntryModal({
 
           <div className="flex justify-end gap-2 pt-2">
             <button
-              className="rounded-xl border border-slate-800 px-3 py-2 text-xs text-slate-300 hover:text-white"
+              disabled={isSaving}
+              className="rounded-xl border border-slate-800 px-3 py-2 text-xs text-slate-300 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={onClose}
             >
               Cancel
             </button>
             <button
-              className="rounded-xl border border-indigo-400/25 bg-indigo-950/25 px-3 py-2 text-xs text-indigo-100 hover:bg-indigo-900/25"
+              disabled={isSaving}
+              className="rounded-xl border border-indigo-400/25 bg-indigo-950/25 px-3 py-2 text-xs text-indigo-100 hover:bg-indigo-900/25 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={onSave}
             >
-              Save
+              {isSaving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
