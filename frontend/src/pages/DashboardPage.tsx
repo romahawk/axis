@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ChevronDown } from "lucide-react";
 
 import { Panel } from "../components/Panel";
 import { NowPanel } from "../features/dashboard/panels/NowPanel";
@@ -53,6 +53,11 @@ export default function DashboardPage() {
     false
   );
 
+  const [projectsOpen, setProjectsOpen] = useLocalStorageJson<boolean>(
+    "axis_active_projects_open_v1",
+    true
+  );
+
   if (isLoading) return <div className="text-slate-400">Loading…</div>;
 
   if (isError) {
@@ -93,7 +98,9 @@ export default function DashboardPage() {
     <div
       className="grid h-full grid-cols-1 gap-4"
       style={{
-        gridTemplateColumns: leftCollapsed ? "72px 1fr 360px" : "320px 1fr 360px",
+        gridTemplateColumns: leftCollapsed
+          ? "72px 1fr 360px"
+          : "320px 1fr 360px",
       }}
     >
       {/* LEFT — Dock */}
@@ -133,40 +140,69 @@ export default function DashboardPage() {
             <div className="text-xl font-semibold">{data.week.week_id}</div>
           </div>
 
-          <WeekOutcomesPanel weekOutcomes={weekOutcomes} putJSON={putJSON} />
+          {/* ✅ WeekOutcomesPanel now contains its own collapsible header (no double title) */}
+          <WeekOutcomesPanel weekOutcomes={weekOutcomes} />
 
-          <Panel title="Active Projects (max 3)" className="axis-tone axis-tone-focus">
-            {activeProjects.length ? (
-              <ul className="space-y-2 text-sm">
-                {activeProjects.map((p) => {
-                  const execUrl = getExecutionSpaceUrl(p);
+          {/* ACTIVE PROJECTS (collapsible + distinct sci-fi tone) */}
+          <Panel
+            className="
+              rounded-2xl border border-cyan-400/15
+              bg-[radial-gradient(1200px_600px_at_0%_0%,rgba(34,211,238,0.12),transparent_55%),linear-gradient(to_bottom,rgba(2,6,23,0.9),rgba(2,6,23,0.6))]
+              shadow-[0_0_0_1px_rgba(34,211,238,0.12)_inset,0_20px_60px_rgba(0,0,0,0.6)]
+            "
+            title={null as any}
+          >
+            <button
+              type="button"
+              onClick={() => setProjectsOpen(!projectsOpen)}
+              className="flex w-full items-center justify-between text-left rounded-xl px-2 py-1 hover:bg-slate-950/30"
+            >
+              <div className="text-sm font-semibold text-slate-100">
+                Active Projects (max 3)
+              </div>
+              <ChevronDown
+                className={[
+                  "h-4 w-4 text-slate-300 transition-transform",
+                  projectsOpen ? "rotate-0" : "-rotate-90",
+                ].join(" ")}
+              />
+            </button>
 
-                  return (
-                    <li
-                      key={p.key}
-                      className="rounded-lg border border-slate-900 p-3"
-                    >
-                      <div className="font-semibold text-slate-100">
-                        {p.name?.trim() || "Untitled project"}
-                      </div>
+            {projectsOpen && (
+              <div className="mt-3">
+                {activeProjects.length ? (
+                  <ul className="space-y-2 text-sm">
+                    {activeProjects.map((p) => {
+                      const execUrl = getExecutionSpaceUrl(p);
 
-                      {execUrl && (
-                        <a
-                          href={execUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-block text-xs text-slate-300 underline hover:text-white"
+                      return (
+                        <li
+                          key={p.key}
+                          className="rounded-lg border border-slate-900 p-3"
                         >
-                          Execution space
-                        </a>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="text-sm text-slate-500">
-                No active projects selected
+                          <div className="font-semibold text-slate-100">
+                            {p.name?.trim() || "Untitled project"}
+                          </div>
+
+                          {execUrl && (
+                            <a
+                              href={execUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block text-xs text-cyan-300 underline hover:text-cyan-200"
+                            >
+                              Execution space
+                            </a>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    No active projects selected
+                  </div>
+                )}
               </div>
             )}
           </Panel>
