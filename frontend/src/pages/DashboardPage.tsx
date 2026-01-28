@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { PanelLeftClose, PanelLeftOpen, ChevronDown } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ChevronDown, ExternalLink } from "lucide-react";
 
 import { Panel } from "../components/Panel";
 import { NowPanel } from "../features/dashboard/panels/NowPanel";
@@ -31,16 +31,21 @@ type WeekOutcome = { id: string; text: string };
 type WeekBlocker = { id: string; text: string };
 type TodayTop3Item = { id: string; text: string; done?: boolean };
 
-function getExecutionSpaceUrl(project: Project): string | null {
-  const exec = project.links.find(
-    (l) => l.label?.trim() === "Execution space" && l.url?.trim()
+function getLinkByLabel(project: Project, label: string): string | null {
+  const hit = project.links.find(
+    (l) => (l.label ?? "").trim().toLowerCase() === label.trim().toLowerCase() && (l.url ?? "").trim()
   );
-  if (exec) return exec.url;
+  return hit?.url ?? null;
+}
 
-  const trello = project.links.find(
-    (l) => l.label?.toLowerCase() === "trello" && l.url?.trim()
-  );
-  return trello?.url ?? null;
+function getExecutionLink(project: Project): { url: string | null; kind: "exec" | "trello" | "missing" } {
+  const exec = getLinkByLabel(project, "Execution space");
+  if (exec) return { url: exec, kind: "exec" };
+
+  const trello = getLinkByLabel(project, "Trello");
+  if (trello) return { url: trello, kind: "trello" };
+
+  return { url: null, kind: "missing" };
 }
 
 export default function DashboardPage() {
@@ -98,9 +103,7 @@ export default function DashboardPage() {
     <div
       className="grid h-full grid-cols-1 gap-4"
       style={{
-        gridTemplateColumns: leftCollapsed
-          ? "72px 1fr 360px"
-          : "320px 1fr 360px",
+        gridTemplateColumns: leftCollapsed ? "72px 1fr 360px" : "320px 1fr 360px",
       }}
     >
       {/* LEFT — Dock */}
@@ -140,7 +143,6 @@ export default function DashboardPage() {
             <div className="text-xl font-semibold">{data.week.week_id}</div>
           </div>
 
-          {/* ✅ WeekOutcomesPanel now contains its own collapsible header (no double title) */}
           <WeekOutcomesPanel weekOutcomes={weekOutcomes} />
 
           {/* ACTIVE PROJECTS (collapsible + distinct sci-fi tone) */}
@@ -173,27 +175,54 @@ export default function DashboardPage() {
                 {activeProjects.length ? (
                   <ul className="space-y-2 text-sm">
                     {activeProjects.map((p) => {
-                      const execUrl = getExecutionSpaceUrl(p);
+                      const link = getExecutionLink(p);
 
                       return (
                         <li
                           key={p.key}
                           className="rounded-lg border border-slate-900 p-3"
                         >
-                          <div className="font-semibold text-slate-100">
-                            {p.name?.trim() || "Untitled project"}
-                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-100">
+                                {p.name?.trim() || "Untitled project"}
+                              </div>
 
-                          {execUrl && (
-                            <a
-                              href={execUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-block text-xs text-cyan-300 underline hover:text-cyan-200"
-                            >
-                              Execution space
-                            </a>
-                          )}
+                              {link.kind === "exec" && link.url && (
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 underline hover:text-cyan-200"
+                                >
+                                  Execution space <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+
+                              {link.kind === "trello" && link.url && (
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 inline-flex items-center gap-1 text-xs text-amber-200 underline hover:text-white"
+                                >
+                                  Operations Board <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+
+                              {link.kind === "missing" && (
+                                <div className="mt-2 text-xs text-slate-400">
+                                  No Execution space / Trello link set.
+                                </div>
+                              )}
+                            </div>
+
+                            {link.kind === "missing" && (
+                              <span className="rounded-full border border-amber-900/50 bg-amber-950/20 px-2 py-0.5 text-[10px] uppercase tracking-widest text-amber-200">
+                                missing link
+                              </span>
+                            )}
+                          </div>
                         </li>
                       );
                     })}
