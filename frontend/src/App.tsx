@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Cpu, CircleDot, ClipboardCheck } from "lucide-react";
 
 import { useMe } from "./hooks/useMe";
@@ -12,6 +12,32 @@ export default function App() {
 
   const [guideOpen, setGuideOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  // ✅ Auto-open Review drawer after "Close day" confirmation
+  useEffect(() => {
+    const onRequestOpenReview = () => {
+      setReviewOpen(true);
+    };
+
+    const onDayClosed = () => {
+      // Fallback: ensure Review opens even if request event isn’t emitted/handled.
+      setReviewOpen(true);
+    };
+
+    window.addEventListener(
+      "axis:request-open-review",
+      onRequestOpenReview as EventListener,
+    );
+    window.addEventListener("axis:day-closed", onDayClosed as EventListener);
+
+    return () => {
+      window.removeEventListener(
+        "axis:request-open-review",
+        onRequestOpenReview as EventListener,
+      );
+      window.removeEventListener("axis:day-closed", onDayClosed as EventListener);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">

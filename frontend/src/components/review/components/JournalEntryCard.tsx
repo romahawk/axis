@@ -6,15 +6,38 @@ export function JournalEntryCard({
   entry,
   onEdit,
   onDelete,
+  onOpen,
   isBusy,
 }: {
   entry: JournalEntry;
   onEdit: () => void;
   onDelete: () => void;
+  onOpen?: () => void;
   isBusy?: boolean;
 }) {
+  const clickable = Boolean(onOpen);
+
   return (
-    <div className="rounded-2xl border border-slate-800/60 bg-slate-950/20 p-4">
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : -1}
+      onClick={clickable ? onOpen : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen?.();
+              }
+            }
+          : undefined
+      }
+      className={[
+        "rounded-2xl border border-slate-800/60 bg-slate-950/20 p-4",
+        clickable ? "cursor-pointer hover:border-slate-700/70" : "",
+      ].join(" ")}
+      title={clickable ? "Open entry" : undefined}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -50,7 +73,10 @@ export function JournalEntryCard({
               isBusy ? "opacity-60 cursor-not-allowed" : "",
             ].join(" ")}
             title="Edit entry"
-            onClick={onEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit
@@ -64,7 +90,10 @@ export function JournalEntryCard({
               isBusy ? "opacity-60 cursor-not-allowed" : "",
             ].join(" ")}
             title="Delete entry"
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete
@@ -76,7 +105,8 @@ export function JournalEntryCard({
         <div className="mt-3 space-y-1 text-xs text-slate-400">
           {entry.wins?.length ? (
             <div>
-              <span className="text-slate-300">Wins:</span> {entry.wins.join(" · ")}
+              <span className="text-slate-300">Wins:</span>{" "}
+              {entry.wins.join(" · ")}
             </div>
           ) : null}
           {entry.miss ? (
@@ -96,7 +126,8 @@ export function JournalEntryCard({
         <div className="mt-3 space-y-1 text-xs text-slate-400">
           {entry.constraint ? (
             <div>
-              <span className="text-slate-300">Constraint:</span> {entry.constraint}
+              <span className="text-slate-300">Constraint:</span>{" "}
+              {entry.constraint}
             </div>
           ) : null}
           {entry.decision ? (
@@ -106,7 +137,8 @@ export function JournalEntryCard({
           ) : null}
           {entry.next_focus ? (
             <div>
-              <span className="text-slate-300">Next focus:</span> {entry.next_focus}
+              <span className="text-slate-300">Next focus:</span>{" "}
+              {entry.next_focus}
             </div>
           ) : null}
         </div>
