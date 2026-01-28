@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ClipboardCheck, X } from "lucide-react";
 
@@ -14,7 +14,196 @@ import { WeeklyReviewForm } from "./components/WeeklyReviewForm";
 import { JournalTimeline } from "./components/JournalTimeline";
 import { EditEntryModal } from "./components/EditEntryModal";
 import { useLockBodyScroll } from "./state/useReviewState";
-import { splitLinesMax3, useReviewState } from "./state/useReviewState";
+import { fmt, splitLinesMax3, useReviewState } from "./state/useReviewState";
+
+/**
+ * Completed tasks snapshots are stored in localStorage as a date-indexed map:
+ * key: "axis_closed_day_snapshots_map_v1"
+ * value: { [YYYY-MM-DD]: { date, closed_at, tasks: [{id,text,done}] } }
+ */
+const CLOSED_DAY_SNAPSHOTS_MAP_KEY = "axis_closed_day_snapshots_map_v1";
+
+type ClosedDaySnapshot = {
+  date: string; // YYYY-MM-DD
+  closed_at?: string;
+  tasks: Array<{ id: string; text: string; done: boolean }>;
+};
+
+function readSnapshotsMap(): Record<string, ClosedDaySnapshot> {
+  try {
+    const raw = localStorage.getItem(CLOSED_DAY_SNAPSHOTS_MAP_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, ClosedDaySnapshot>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function ViewEntryModal({
+  entry,
+  onClose,
+}: {
+  entry: JournalEntry;
+  onClose: () => void;
+}) {
+  const ymd =
+    typeof entry.created_at === "string" ? entry.created_at.slice(0, 10) : "";
+  const snapshot = ymd ? readSnapshotsMap()[ymd] : undefined;
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+
+      <div className="relative w-full max-w-lg rounded-2xl border border-slate-800/70 bg-slate-950 p-4 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className={[
+                  "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-widest border",
+                  entry.type === "daily"
+                    ? "border-indigo-400/25 bg-indigo-950/25 text-indigo-100"
+                    : "border-emerald-400/25 bg-emerald-950/20 text-emerald-100",
+                ].join(" ")}
+              >
+                {entry.type}
+              </span>
+              <div className="text-xs text-slate-400 truncate">
+                {fmt(entry.created_at)}
+              </div>
+            </div>
+
+            <div className="mt-1 text-sm font-semibold text-slate-100">
+              {entry.type === "daily" ? "Daily entry" : "Weekly entry"}
+            </div>
+
+            <div className="mt-1 text-xs text-slate-400">
+              Read-only view. Use Edit to change.
+            </div>
+
+            {ymd ? (
+              <div className="mt-1 text-xs text-slate-500">{ymd}</div>
+            ) : null}
+          </div>
+
+          <button
+            className="rounded-lg border border-slate-800/70 bg-slate-950/30 p-2 text-slate-300 hover:text-white"
+            onClick={onClose}
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {/* ✅ Completed tasks (if snapshot exists for the day) */}
+          {snapshot?.tasks?.length ? (
+            <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                Completed tasks
+              </div>
+
+              <div className="mt-2 text-sm text-slate-200">
+                <ul className="list-disc pl-5 space-y-1">
+                  {snapshot.tasks.slice(0, 3).map((t) => (
+                    <li key={t.id}>{t.text || "—"}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+
+          {entry.type === "daily" ? (
+            <>
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Wins
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.wins?.length ? entry.wins.join(" · ") : "—"}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Miss
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.miss || "—"}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Fix
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.fix || "—"}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Constraint
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.constraint || "—"}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Decision
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.decision || "—"}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Next focus
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {entry.next_focus || "—"}
+                </div>
+              </div>
+
+              {/* If backend later provides outcomes[], show them */}
+              {(entry as any).outcomes?.length ? (
+                <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Outcomes
+                  </div>
+                  <div className="mt-2 text-sm text-slate-200">
+                    <ul className="list-disc pl-5 space-y-1">
+                      {(entry as any).outcomes.map((o: any) => (
+                        <li key={o.id}>
+                          <span className="text-slate-300">{o.id}:</span>{" "}
+                          {o.note || "—"}{" "}
+                          {o.achieved ? (
+                            <span className="text-emerald-300/80">
+                              (achieved)
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">(missed)</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -32,7 +221,10 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
   const isBusy = updateEntry.isPending || deleteEntry.isPending;
 
-  // ESC closes
+  // ✅ Read-only “view entry” modal
+  const [viewEntry, setViewEntry] = useState<JournalEntry | null>(null);
+
+  // ESC closes drawer
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -42,12 +234,34 @@ export function ReviewDrawer({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  const setTab = s.setTab;
+
+  // ✅ When a day is explicitly closed, jump to Daily closeout
+  useEffect(() => {
+    const onDayClosed = () => {
+      setTab("daily");
+
+      // If drawer is closed, ask shell to open it
+      if (!open) {
+        window.dispatchEvent(
+          new CustomEvent("axis:request-open-review", {
+            detail: { tab: "daily" },
+          }),
+        );
+      }
+    };
+
+    window.addEventListener("axis:day-closed", onDayClosed as EventListener);
+    return () =>
+      window.removeEventListener("axis:day-closed", onDayClosed as EventListener);
+  }, [open, setTab]);
+
   const portalTarget = s.portalTarget;
 
   // ✅ not a hook, safe before early return
   const entries: JournalEntry[] = journal.data?.entries ?? [];
 
-  // ✅ early return is now safe because no hooks appear below it
+  // ✅ early return is safe because no hooks appear below
   if (!portalTarget) return null;
 
   const Tabs = (
@@ -190,8 +404,12 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4">
-          {s.tab === "daily" && <DailyReviewForm onSuccess={() => s.setTab("journal")} />}
-          {s.tab === "weekly" && <WeeklyReviewForm onSuccess={() => s.setTab("journal")} />}
+          {s.tab === "daily" && (
+            <DailyReviewForm onSuccess={() => s.setTab("journal")} />
+          )}
+          {s.tab === "weekly" && (
+            <WeeklyReviewForm onSuccess={() => s.setTab("journal")} />
+          )}
 
           {s.tab === "journal" && (
             <div className="space-y-3">
@@ -227,6 +445,7 @@ export function ReviewDrawer({ open, onClose }: Props) {
                   <JournalTimeline
                     entries={entries}
                     isBusy={isBusy}
+                    onOpen={(entry) => setViewEntry(entry)}
                     onEdit={s.openEdit}
                     onDelete={(id) => s.setDeleteId(id)}
                   />
@@ -255,6 +474,11 @@ export function ReviewDrawer({ open, onClose }: Props) {
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-400/25 to-transparent" />
           Rule: Log signal. Don’t overthink.
         </div>
+
+        {/* View modal */}
+        {viewEntry && (
+          <ViewEntryModal entry={viewEntry} onClose={() => setViewEntry(null)} />
+        )}
 
         {/* Edit modal */}
         {s.editId && (

@@ -19,8 +19,50 @@ type ToggleToday = {
 const HIDE_CHECKED_KEY = "axis_today_hide_checked_v1";
 const EOD_ENABLED_KEY = "axis_today_eod_enabled_v1";
 
+// Immediate “last close” snapshot (used by Daily form)
+const CLOSED_DAY_SNAPSHOT_KEY = "axis_closed_day_snapshot_v1";
+
+// ✅ Persistent map used by Journal entry view modal
+const CLOSED_DAY_SNAPSHOTS_MAP_KEY = "axis_closed_day_snapshots_map_v1";
+
 function clamp3(items: TodayTop3Item[]) {
   return (items ?? []).slice(0, 3);
+}
+
+type ClosedDaySnapshot = {
+  date: string; // YYYY-MM-DD
+  closed_at: string;
+  tasks: Array<{ id: string; text: string; done: boolean }>;
+};
+
+function readSnapshotsMap(): Record<string, ClosedDaySnapshot> {
+  try {
+    const raw = localStorage.getItem(CLOSED_DAY_SNAPSHOTS_MAP_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, ClosedDaySnapshot>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSnapshotsMap(next: Record<string, ClosedDaySnapshot>) {
+  try {
+    localStorage.setItem(CLOSED_DAY_SNAPSHOTS_MAP_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+// Keep map bounded (prevents localStorage bloat)
+function pruneMap(map: Record<string, ClosedDaySnapshot>, keepLast = 45) {
+  const keys = Object.keys(map).sort(); // YYYY-MM-DD sorts lexicographically
+  if (keys.length <= keepLast) return map;
+
+  const toDrop = keys.slice(0, keys.length - keepLast);
+  const next = { ...map };
+  for (const k of toDrop) delete next[k];
+  return next;
 }
 
 export function TodayTop3Panel(props: {
@@ -33,17 +75,16 @@ export function TodayTop3Panel(props: {
 
   const [hideChecked, setHideChecked] = useLocalStorageJson<boolean>(
     HIDE_CHECKED_KEY,
-    false
+    false,
   );
 
-  // ✅ Manual EOD toggle (persisted)
   const [eodEnabled, setEodEnabled] = useLocalStorageJson<boolean>(
     EOD_ENABLED_KEY,
-    false
+    false,
   );
 
-  const items = clamp3(props.todayTop3);
-  const doneCount = items.filter((i) => Boolean(i.done)).length;
+  const items = clamp3(props.todayTop3 ?? []);
+  const doneCount = items.filter((i: TodayTop3Item) => Boolean(i.done)).length;
   const pct = Math.round((doneCount / 3) * 100);
   const isCompleted = doneCount === 3;
 
@@ -62,38 +103,60 @@ export function TodayTop3Panel(props: {
     putJSON: props.putJSON,
   });
 
-  // 🔒 AUTO-HIDE checked items when day is completed
+  // ✅ AUTO-HIDE checked items only once when completion happens
+  const prevCompletedRef = React.useRef<boolean>(false);
   React.useEffect(() => {
-    if (isCompleted && !hideChecked) {
-      setHideChecked(true);
+    const wasCompleted = prevCompletedRef.current;
+    if (!wasCompleted && isCompleted) {
+      if (!hideChecked) setHideChecked(true);
     }
+    prevCompletedRef.current = isCompleted;
   }, [isCompleted, hideChecked, setHideChecked]);
 
   const visibleItems = hideChecked ? items.filter((i) => !i.done) : items;
 
   async function closeDay() {
-    // Soft close: reset Today to placeholders for next day
-    await props.putJSON("/api/v1/today/top3", {
-      items: ["—", "—", "—"],
-    });
+    const snapshot: ClosedDaySnapshot = {
+      date: props.date,
+      closed_at: new Date().toISOString(),
+      tasks: items.map((t) => ({
+        id: t.id,
+        text: t.text,
+        done: Boolean(t.done),
+      })),
+    };
+
+    // 1) Save “last snapshot” (Daily form uses this)
+    try {
+      localStorage.setItem(CLOSED_DAY_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {
+      // ignore
+    }
+
+    // 2) Save date-indexed snapshot map (Journal view uses this)
+    const map = readSnapshotsMap();
+    const next = pruneMap({ ...map, [snapshot.date]: snapshot }, 45);
+    writeSnapshotsMap(next);
+
+    // Reset Today
+    await props.putJSON("/api/v1/today/top3", { items: ["—", "—", "—"] });
     await qc.invalidateQueries({ queryKey: ["dashboard"] });
+
+    // Signal UI
+    window.dispatchEvent(new CustomEvent("axis:day-closed", { detail: snapshot }));
   }
 
   return (
     <Panel
       title={`Today — Top 3 (${props.date})`}
-      className={`axis-tone axis-tone-today ${
-        isCompleted ? "border-emerald-900/60" : ""
-      }`}
+      className={`axis-tone axis-tone-today ${isCompleted ? "border-emerald-900/60" : ""}`}
     >
-      {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="text-xs text-slate-500">
             Rule: 3 slots. Execute first. Edit only when needed.
           </div>
 
-          {/* Progress */}
           <div className="flex items-center gap-3">
             <div className="h-2 w-40 rounded-full bg-slate-800">
               <div
@@ -115,14 +178,12 @@ export function TodayTop3Panel(props: {
           </div>
         </div>
 
-        {/* Mode controls */}
         {!editMode ? (
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-xs text-slate-300">
               EXECUTE
             </span>
 
-            {/* ✅ Manual EOD toggle */}
             <button
               type="button"
               className={[
@@ -167,14 +228,12 @@ export function TodayTop3Panel(props: {
         )}
       </div>
 
-      {/* ✅ Manual EOD signal */}
       {!editMode && eodEnabled && !isCompleted && (
         <div className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/10 p-2 text-xs text-amber-200">
           End-of-day check: finish one item or consciously park it.
         </div>
       )}
 
-      {/* EXECUTE vs EDIT */}
       {!editMode ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -200,7 +259,7 @@ export function TodayTop3Panel(props: {
           <CheckList
             title=""
             items={visibleItems}
-            onToggle={(id, nextDone) =>
+            onToggle={(id: string, nextDone: boolean) =>
               props.toggleToday.mutate({
                 kind: "outcomes",
                 id,
@@ -211,13 +270,13 @@ export function TodayTop3Panel(props: {
         </div>
       ) : (
         <div className="space-y-2">
-          {draft.slice(0, 3).map((v, idx) => (
+          {draft.slice(0, 3).map((v: string, idx: number) => (
             <input
               key={idx}
               className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
               value={v}
               onChange={(e) =>
-                setDraft((prev) => {
+                setDraft((prev: string[]) => {
                   const next = [...prev];
                   next[idx] = e.target.value;
                   return next;
