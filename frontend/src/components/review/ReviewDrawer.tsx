@@ -19,14 +19,67 @@ import { fmt, splitLinesMax3, useReviewState } from "./state/useReviewState";
 /**
  * Completed tasks snapshots are stored in localStorage as a date-indexed map:
  * key: "axis_closed_day_snapshots_map_v1"
- * value: { [YYYY-MM-DD]: { date, closed_at, tasks: [{id,text,done}] } }
+ * value: { [YYYY-MM-DD]: { date, closed_at, tasks: [{id,text,done,area}] } }
  */
 const CLOSED_DAY_SNAPSHOTS_MAP_KEY = "axis_closed_day_snapshots_map_v1";
+
+/* ======================
+   Life Areas (canonical)
+====================== */
+type LifeArea =
+  | "career"
+  | "ai_leverage"
+  | "health"
+  | "family"
+  | "finance"
+  | "admin"
+  | "education"
+  | "none";
+
+const AREA_LABEL: Record<LifeArea, string> = {
+  career: "Career",
+  ai_leverage: "AI × Leverage",
+  health: "Health",
+  family: "Family",
+  finance: "Finance",
+  admin: "Admin",
+  education: "Education",
+  none: "—",
+};
+
+const AREA_PILL_CLASS: Record<LifeArea, string> = {
+  career: "border-indigo-400/25 bg-indigo-950/25 text-indigo-100",
+  ai_leverage: "border-cyan-400/25 bg-cyan-950/20 text-cyan-100",
+  health: "border-emerald-400/25 bg-emerald-950/20 text-emerald-100",
+  family: "border-pink-400/25 bg-pink-950/20 text-pink-100",
+  finance: "border-amber-400/25 bg-amber-950/20 text-amber-100",
+  admin: "border-slate-400/20 bg-slate-950/30 text-slate-200",
+  education: "border-violet-400/25 bg-violet-950/20 text-violet-100",
+  none: "border-slate-800/70 bg-slate-950/30 text-slate-400",
+};
+
+function AreaPill({ area }: { area: LifeArea }) {
+  return (
+    <span
+      className={[
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-widest",
+        AREA_PILL_CLASS[area],
+      ].join(" ")}
+      title={AREA_LABEL[area]}
+    >
+      {AREA_LABEL[area]}
+    </span>
+  );
+}
+
+/* ======================
+   Snapshot reading
+====================== */
 
 type ClosedDaySnapshot = {
   date: string; // YYYY-MM-DD
   closed_at?: string;
-  tasks: Array<{ id: string; text: string; done: boolean }>;
+  tasks: Array<{ id: string; text: string; done: boolean; area: LifeArea }>;
 };
 
 function readSnapshotsMap(): Record<string, ClosedDaySnapshot> {
@@ -40,6 +93,9 @@ function readSnapshotsMap(): Record<string, ClosedDaySnapshot> {
   }
 }
 
+/* ======================
+   View modal
+====================== */
 function ViewEntryModal({
   entry,
   onClose,
@@ -49,6 +105,7 @@ function ViewEntryModal({
 }) {
   const ymd =
     typeof entry.created_at === "string" ? entry.created_at.slice(0, 10) : "";
+
   const snapshot = ymd ? readSnapshotsMap()[ymd] : undefined;
 
   return (
@@ -97,7 +154,7 @@ function ViewEntryModal({
         </div>
 
         <div className="mt-4 space-y-3">
-          {/* ✅ Completed tasks (if snapshot exists for the day) */}
+          {/* ✅ Completed tasks with area pills (from snapshot map) */}
           {snapshot?.tasks?.length ? (
             <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
               <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
@@ -105,9 +162,14 @@ function ViewEntryModal({
               </div>
 
               <div className="mt-2 text-sm text-slate-200">
-                <ul className="list-disc pl-5 space-y-1">
+                <ul className="space-y-2">
                   {snapshot.tasks.slice(0, 3).map((t) => (
-                    <li key={t.id}>{t.text || "—"}</li>
+                    <li key={t.id} className="flex items-start gap-2">
+                      <span className="mt-[2px]">
+                        <AreaPill area={(t.area ?? "none") as LifeArea} />
+                      </span>
+                      <span className="text-slate-200">{t.text || "—"}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -150,7 +212,7 @@ function ViewEntryModal({
                   Constraint
                 </div>
                 <div className="mt-2 text-sm text-slate-200">
-                  {entry.constraint || "—"}
+                  {(entry as any).constraint || "—"}
                 </div>
               </div>
 
@@ -159,7 +221,7 @@ function ViewEntryModal({
                   Decision
                 </div>
                 <div className="mt-2 text-sm text-slate-200">
-                  {entry.decision || "—"}
+                  {(entry as any).decision || "—"}
                 </div>
               </div>
 
@@ -168,11 +230,10 @@ function ViewEntryModal({
                   Next focus
                 </div>
                 <div className="mt-2 text-sm text-slate-200">
-                  {entry.next_focus || "—"}
+                  {(entry as any).next_focus || "—"}
                 </div>
               </div>
 
-              {/* If backend later provides outcomes[], show them */}
               {(entry as any).outcomes?.length ? (
                 <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
                   <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
@@ -205,6 +266,9 @@ function ViewEntryModal({
   );
 }
 
+/* ======================
+   Drawer
+====================== */
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -221,7 +285,7 @@ export function ReviewDrawer({ open, onClose }: Props) {
 
   const isBusy = updateEntry.isPending || deleteEntry.isPending;
 
-  // ✅ Read-only “view entry” modal
+  // ✅ Read-only view modal state
   const [viewEntry, setViewEntry] = useState<JournalEntry | null>(null);
 
   // ESC closes drawer
@@ -241,12 +305,11 @@ export function ReviewDrawer({ open, onClose }: Props) {
     const onDayClosed = () => {
       setTab("daily");
 
-      // If drawer is closed, ask shell to open it
       if (!open) {
         window.dispatchEvent(
           new CustomEvent("axis:request-open-review", {
             detail: { tab: "daily" },
-          }),
+          })
         );
       }
     };
@@ -257,11 +320,8 @@ export function ReviewDrawer({ open, onClose }: Props) {
   }, [open, setTab]);
 
   const portalTarget = s.portalTarget;
-
-  // ✅ not a hook, safe before early return
   const entries: JournalEntry[] = journal.data?.entries ?? [];
 
-  // ✅ early return is safe because no hooks appear below
   if (!portalTarget) return null;
 
   const Tabs = (
@@ -459,7 +519,7 @@ export function ReviewDrawer({ open, onClose }: Props) {
                       {String(
                         (updateEntry.error as any)?.message ??
                           (deleteEntry.error as any)?.message ??
-                          "Operation failed",
+                          "Operation failed"
                       )}
                     </div>
                   )}
@@ -547,6 +607,6 @@ export function ReviewDrawer({ open, onClose }: Props) {
         )}
       </div>
     </div>,
-    portalTarget,
+    portalTarget
   );
 }
