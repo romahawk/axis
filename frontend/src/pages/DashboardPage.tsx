@@ -143,7 +143,8 @@ export default function DashboardPage() {
             <div className="text-xl font-semibold">{data.week.week_id}</div>
           </div>
 
-          <WeekOutcomesPanel weekOutcomes={weekOutcomes} />
+          <WeekOutcomesPanel weekOutcomes={weekOutcomes} putJSON={putJSON} />
+
 
           {/* ACTIVE PROJECTS (collapsible + distinct sci-fi tone) */}
           <Panel

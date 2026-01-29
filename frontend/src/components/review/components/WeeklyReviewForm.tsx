@@ -1,5 +1,5 @@
 // src/features/review/components/WeeklyReviewForm.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { useCreateWeeklyReview } from "../../../hooks/useJournal";
 import type { WeeklyOutcomeDraft } from "../types";
@@ -10,6 +10,36 @@ const DEFAULT_OUTCOMES: WeeklyOutcomeDraft[] = [
   { id: "w3", achieved: false, note: "" },
 ];
 
+const WEEK_SEED_KEY = "axis_week_closeout_seed_v1";
+
+type WeekCloseoutSeed = {
+  week_id?: string; // e.g. 2026-W05
+  created_at?: string;
+  outcomes?: string[]; // 3 clean lines
+};
+
+function getISOWeekKey(d = new Date()): string {
+  // ISO week: YYYY-W##
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((+date - +yearStart) / 86400000 + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function safeReadWeekSeed(): WeekCloseoutSeed | null {
+  try {
+    const raw = localStorage.getItem(WEEK_SEED_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WeekCloseoutSeed;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
   const [weeklyOutcomes, setWeeklyOutcomes] =
     useState<WeeklyOutcomeDraft[]>(DEFAULT_OUTCOMES);
@@ -18,6 +48,27 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
   const [weeklyNextFocus, setWeeklyNextFocus] = useState("");
 
   const createWeekly = useCreateWeeklyReview();
+
+  // ✅ Auto-populate from “Close week” seed (like Daily snapshot → Daily closeout)
+  useEffect(() => {
+    const seed = safeReadWeekSeed();
+    if (!seed?.outcomes?.length) return;
+
+    const currentWeek = getISOWeekKey();
+    // If seed has week_id and it doesn't match current week, ignore.
+    if (seed.week_id && seed.week_id !== currentWeek) return;
+
+    const lines = seed.outcomes.slice(0, 3).map((s) => (s ?? "").trim());
+
+    setWeeklyOutcomes((prev) => {
+      const base = prev?.length === 3 ? prev : DEFAULT_OUTCOMES;
+      return base.map((o, idx) => ({
+        ...o,
+        achieved: false,
+        note: lines[idx] ?? "",
+      }));
+    });
+  }, []);
 
   async function onSaveWeekly() {
     const payload = {
@@ -36,6 +87,20 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
     if (!anyOutcome && !anyText) return;
 
     await createWeekly.mutateAsync(payload);
+
+    // ✅ Clear seed after successful save (prevents re-populating on next open)
+    try {
+      localStorage.removeItem(WEEK_SEED_KEY);
+    } catch {
+      // ignore
+    }
+
+    // Optional system signal (mirrors day flow)
+    window.dispatchEvent(
+      new CustomEvent("axis:week-closed", {
+        detail: { week: getISOWeekKey() },
+      })
+    );
 
     setWeeklyOutcomes(DEFAULT_OUTCOMES);
     setWeeklyConstraint("");
