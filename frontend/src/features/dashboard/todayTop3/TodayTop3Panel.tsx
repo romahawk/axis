@@ -22,6 +22,7 @@ type LifeArea =
   | "family"
   | "finance"
   | "admin"
+  | "education"
   | "none";
 
 const AREA_OPTIONS: Array<{ value: LifeArea; label: string }> = [
@@ -31,6 +32,7 @@ const AREA_OPTIONS: Array<{ value: LifeArea; label: string }> = [
   { value: "family", label: "Family" },
   { value: "finance", label: "Finance" },
   { value: "admin", label: "Admin" },
+  { value: "education", label: "Education" },
   { value: "none", label: "—" },
 ];
 
@@ -41,6 +43,7 @@ const AREA_PILL_CLASS: Record<LifeArea, string> = {
   family: "border-pink-400/25 bg-pink-950/20 text-pink-100",
   finance: "border-amber-400/25 bg-amber-950/20 text-amber-100",
   admin: "border-slate-400/20 bg-slate-950/30 text-slate-200",
+  education: "border-violet-400/25 bg-violet-950/20 text-violet-100",
   none: "border-slate-800/70 bg-slate-950/30 text-slate-400",
 };
 
@@ -63,6 +66,7 @@ function parseBracketTag(input: string): { area: LifeArea; text: string } {
     "family",
     "finance",
     "admin",
+    "education",
     "none",
   ]);
 
