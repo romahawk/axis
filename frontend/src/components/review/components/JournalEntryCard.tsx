@@ -52,9 +52,8 @@ function AreaPill({ area }: { area: LifeArea }) {
 }
 
 /* ======================
-   Snapshot → area
+   Daily snapshot → area
 ====================== */
-
 const CLOSED_DAY_SNAPSHOTS_MAP_KEY = "axis_closed_day_snapshots_map_v1";
 
 type ClosedDaySnapshot = {
@@ -94,18 +93,56 @@ function dominantArea(areas: LifeArea[]): LifeArea {
   );
 }
 
-function getEntryArea(entry: JournalEntry): LifeArea {
-  // Weekly entries do not yet store area in a reliable way
-  if (entry.type !== "daily") return "none";
+function getDailyArea(entry: JournalEntry): LifeArea {
   if (typeof entry.created_at !== "string") return "none";
-
   const ymd = entry.created_at.slice(0, 10);
   const map = readSnapshotsMap();
   const snap = map[ymd];
-
   if (!snap?.tasks?.length) return "none";
+  return dominantArea(snap.tasks.map((t) => (t.area ?? "none") as LifeArea));
+}
 
-  const areas = snap.tasks.map((t) => (t.area ?? "none") as LifeArea);
+/* ======================
+   Weekly outcomes → area
+====================== */
+
+function parseBracketArea(s: string): LifeArea | null {
+  const m = (s ?? "").trim().match(/^\[([a-z_]+)\]\s*/i);
+  if (!m) return null;
+  const raw = (m[1] ?? "").toLowerCase() as LifeArea;
+  return AREA_PILL_CLASS[raw] ? raw : null;
+}
+
+function inferAreaFromOutcomeId(id: string): LifeArea | null {
+  const norm = (id ?? "").toLowerCase();
+  // support W1 / w1 / outcome1 etc. Keep it conservative.
+  if (norm === "w1") return "career";
+  if (norm === "w2") return "ai_leverage";
+  if (norm === "w3") return "health";
+  return null;
+}
+
+function getWeeklyArea(entry: JournalEntry): LifeArea | null {
+  const outcomes = (entry as any).outcomes as
+    | Array<{ id?: string; note?: string }>
+    | undefined;
+
+  if (!outcomes?.length) return null;
+
+  const areas: LifeArea[] = [];
+
+  for (const o of outcomes) {
+    if (o?.note) {
+      const a = parseBracketArea(o.note);
+      if (a) areas.push(a);
+    }
+    if (!o?.note || !parseBracketArea(o.note)) {
+      const inferred = o?.id ? inferAreaFromOutcomeId(String(o.id)) : null;
+      if (inferred) areas.push(inferred);
+    }
+  }
+
+  if (!areas.length) return null;
   return dominantArea(areas);
 }
 
@@ -127,7 +164,20 @@ export function JournalEntryCard({
   isBusy?: boolean;
 }) {
   const clickable = Boolean(onOpen);
-  const area = getEntryArea(entry);
+
+  const dailyArea = entry.type === "daily" ? getDailyArea(entry) : null;
+  const weeklyArea = entry.type === "weekly" ? getWeeklyArea(entry) : null;
+
+  // Rule:
+  // - Daily: always show area pill (even "Unlabeled" can be informative)
+  // - Weekly: show only if we can infer; otherwise hide (prevents "Unlabeled" weekly cards)
+  const showAreaPill =
+    entry.type === "daily" ? true : entry.type === "weekly" ? Boolean(weeklyArea) : false;
+
+  const areaToShow: LifeArea =
+    entry.type === "daily"
+      ? (dailyArea ?? "none")
+      : (weeklyArea ?? "none");
 
   return (
     <div
@@ -165,8 +215,8 @@ export function JournalEntryCard({
               {entry.type}
             </span>
 
-            {/* ✅ Area pill preview (daily derived from snapshot map) */}
-            <AreaPill area={area} />
+            {/* ✅ Area pill preview */}
+            {showAreaPill ? <AreaPill area={areaToShow} /> : null}
 
             <div className="text-xs text-slate-400 truncate">
               {fmt(entry.created_at)}
@@ -179,7 +229,7 @@ export function JournalEntryCard({
               : (entry as any).next_focus ??
                 (entry as any).decision ??
                 (entry as any).constraint ??
-                "—"}
+                ((entry as any).outcomes?.[0]?.note ?? "—")}
           </div>
         </div>
 
@@ -220,7 +270,6 @@ export function JournalEntryCard({
         </div>
       </div>
 
-      {/* Optional detail preview (kept from prior version) */}
       {entry.type === "daily" && (
         <div className="mt-3 space-y-1 text-xs text-slate-400">
           {entry.wins?.length ? (

@@ -319,6 +319,26 @@ export function ReviewDrawer({ open, onClose }: Props) {
       window.removeEventListener("axis:day-closed", onDayClosed as EventListener);
   }, [open, setTab]);
 
+  // ✅ When a week is explicitly closed, jump to Weekly closeout
+  useEffect(() => {
+    const onRequestOpen = (e: Event) => {
+      const ce = e as CustomEvent;
+      const tab = ce.detail?.tab as "daily" | "weekly" | "journal" | undefined;
+      if (tab) s.setTab(tab);
+    };
+
+    window.addEventListener(
+      "axis:request-open-review",
+      onRequestOpen as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "axis:request-open-review",
+        onRequestOpen as EventListener,
+      );
+  }, [s]);
+
+
   const portalTarget = s.portalTarget;
   const entries: JournalEntry[] = journal.data?.entries ?? [];
 
