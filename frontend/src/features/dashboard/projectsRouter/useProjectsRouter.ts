@@ -24,6 +24,8 @@ export function useProjectsRouter(params: {
   const activeProjects = projects.filter((p) => p.is_active);
   const inactiveProjects = projects.filter((p) => !p.is_active);
   const activeCount = activeProjects.length;
+
+  // Display order: actives first, then inactives, preserving relative order in each segment.
   const sortedProjects = [...activeProjects, ...inactiveProjects];
 
   function startEditProject(p: Project) {
@@ -55,7 +57,6 @@ export function useProjectsRouter(params: {
   async function saveProjectDraft() {
     if (!projectDraft) return;
 
-    // Guard: names are user-facing and must never be empty.
     const trimmedName = (projectDraft.name ?? "").trim();
     if (!trimmedName) {
       setProjectSaveError("Project name cannot be empty");
@@ -115,7 +116,6 @@ export function useProjectsRouter(params: {
     saveProjects(nextProjects)
       .then(() => {
         setEditingProjectKey(key);
-        // Use a copy so edits don't accidentally mutate the object we pushed into the list.
         setProjectDraft(JSON.parse(JSON.stringify(newProject)) as Project);
       })
       .catch(() => {
@@ -131,6 +131,73 @@ export function useProjectsRouter(params: {
     }
 
     const nextProjects = projects.filter((p) => p.key !== key);
+
+    try {
+      await saveProjects(nextProjects);
+    } catch {
+      // error already set
+    }
+  }
+
+  /**
+   * Reorder projects as displayed in the router.
+   * Rules:
+   * - Active projects always stay in the active segment (top).
+   * - Inactive projects reorder within the inactive segment.
+   * - Cross-segment drop snaps to boundary:
+   *   - active -> before first inactive
+   *   - inactive -> after last active
+   */
+  async function reorderProjects(dragKey: string, dropKey: string) {
+    if (projectSaving) return;
+    if (dragKey === dropKey) return;
+
+    const byKey = new Map(sortedProjects.map((p) => [p.key, p] as const));
+    const drag = byKey.get(dragKey);
+    if (!drag) return;
+
+    const activeKeys = sortedProjects.filter((p) => p.is_active).map((p) => p.key);
+    const inactiveKeys = sortedProjects
+      .filter((p) => !p.is_active)
+      .map((p) => p.key);
+
+    const isDragActive = !!drag.is_active;
+    const inActiveSegment = new Set(activeKeys);
+
+    const srcList = isDragActive ? activeKeys : inactiveKeys;
+    const srcIndex = srcList.indexOf(dragKey);
+    if (srcIndex < 0) return;
+
+    // Remove from its segment list first
+    const nextList = [...srcList];
+    nextList.splice(srcIndex, 1);
+
+    const dropIsInSameSegment = isDragActive
+      ? inActiveSegment.has(dropKey)
+      : !inActiveSegment.has(dropKey);
+
+    let toIndex: number;
+    if (dropIsInSameSegment) {
+      const dropIndex = nextList.indexOf(dropKey);
+      if (dropIndex < 0) return;
+      toIndex = dropIndex;
+    } else {
+      // Cross segment: snap to boundary.
+      toIndex = isDragActive ? nextList.length : 0;
+    }
+
+    nextList.splice(toIndex, 0, dragKey);
+
+    const nextActiveKeys = isDragActive ? nextList : activeKeys;
+    const nextInactiveKeys = isDragActive ? inactiveKeys : nextList;
+
+    const nextOrderKeys = [...nextActiveKeys, ...nextInactiveKeys];
+
+    // Build ordered project array from current canonical projects prop.
+    const currentByKey = new Map(projects.map((p) => [p.key, p] as const));
+    const nextProjects = nextOrderKeys
+      .map((k) => currentByKey.get(k))
+      .filter(Boolean) as Project[];
 
     try {
       await saveProjects(nextProjects);
@@ -163,5 +230,6 @@ export function useProjectsRouter(params: {
     promoteToActive,
     addNewProject,
     deleteProject,
+    reorderProjects,
   };
 }
