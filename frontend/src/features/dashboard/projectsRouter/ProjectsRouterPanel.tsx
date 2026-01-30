@@ -7,6 +7,7 @@ import {
   Trash2,
   ExternalLink,
   X,
+  GripVertical,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
@@ -47,6 +48,7 @@ export function ProjectsRouterPanel(props: {
     promoteToActive,
     addNewProject,
     deleteProject,
+    reorderProjects,
   } = useProjectsRouter({
     projects: props.projects ?? [],
     queryClient: qc,
@@ -55,6 +57,10 @@ export function ProjectsRouterPanel(props: {
 
   // Active projects expanded by default; preserve manual expansions.
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set());
+
+  // Drag + drop ordering (HTML5 DnD)
+  const [draggingKey, setDraggingKey] = React.useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const activeKeys = new Set(
@@ -70,6 +76,33 @@ export function ProjectsRouterPanel(props: {
       else n.add(key);
       return n;
     });
+  }
+
+  function onDragStart(e: React.DragEvent, key: string) {
+    e.dataTransfer.setData("text/plain", key);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingKey(key);
+  }
+
+  function onDragOver(e: React.DragEvent, key: string) {
+    // Required to allow drop.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverKey(key);
+  }
+
+  async function onDrop(e: React.DragEvent, dropKey: string) {
+    e.preventDefault();
+    const dragKey = e.dataTransfer.getData("text/plain");
+    setDragOverKey(null);
+    setDraggingKey(null);
+    if (!dragKey) return;
+    await reorderProjects(dragKey, dropKey);
+  }
+
+  function onDragEnd() {
+    setDragOverKey(null);
+    setDraggingKey(null);
   }
 
   return (
@@ -133,16 +166,37 @@ export function ProjectsRouterPanel(props: {
           return (
             <li
               key={p.key}
+              onDragOver={(e) => onDragOver(e, p.key)}
+              onDragEnter={() => setDragOverKey(p.key)}
+              onDragLeave={() =>
+                setDragOverKey((prev) => (prev === p.key ? null : prev))
+              }
+              onDrop={(e) => onDrop(e, p.key)}
+              onDragEnd={onDragEnd}
               className={[
                 "rounded-lg border",
                 isActive
                   ? "border-emerald-900/60 bg-emerald-950/20"
                   : "border-slate-900 bg-slate-950/10",
                 !isActive ? "opacity-60" : "opacity-100",
+                draggingKey === p.key ? "ring-1 ring-slate-600" : "",
+                dragOverKey === p.key && draggingKey !== p.key
+                  ? "ring-1 ring-slate-500"
+                  : "",
               ].join(" ")}
             >
               {/* Header row */}
               <div className="flex items-start justify-between gap-2 p-3">
+                <div
+                  className="mt-0.5 select-none text-slate-500"
+                  title="Drag to reorder"
+                  aria-hidden="true"
+                  draggable={!isEditing && !projectSaving}
+                  onDragStart={(e) => onDragStart(e, p.key)}
+                >
+                  <GripVertical className="h-4 w-4" />
+                </div>
+
                 <button
                   type="button"
                   className="min-w-0 flex-1 text-left"
@@ -175,7 +229,6 @@ export function ProjectsRouterPanel(props: {
                     </div>
                   </div>
 
-                  {/* Internal key is intentionally hidden from the normal UI */}
                   {isEditing ? (
                     <div className="mt-1 text-xs text-slate-500">{p.key}</div>
                   ) : null}
@@ -273,7 +326,6 @@ export function ProjectsRouterPanel(props: {
                       {(projectDraft?.links ?? []).map((l, idx) => (
                         <div
                           key={idx}
-                          // ✅ responsive: stack in narrow sidebar, 2 cols + remove on md+
                           className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center"
                         >
                           <input
@@ -284,10 +336,7 @@ export function ProjectsRouterPanel(props: {
                               setProjectDraft((d) => {
                                 if (!d) return d;
                                 const links = [...d.links];
-                                links[idx] = {
-                                  ...links[idx],
-                                  label: e.target.value,
-                                };
+                                links[idx] = { ...links[idx], label: e.target.value };
                                 return { ...d, links };
                               })
                             }
@@ -329,10 +378,7 @@ export function ProjectsRouterPanel(props: {
                         onClick={() =>
                           setProjectDraft((d) => {
                             if (!d) return d;
-                            return {
-                              ...d,
-                              links: [...d.links, { label: "", url: "" }],
-                            };
+                            return { ...d, links: [...d.links, { label: "", url: "" }] };
                           })
                         }
                         type="button"

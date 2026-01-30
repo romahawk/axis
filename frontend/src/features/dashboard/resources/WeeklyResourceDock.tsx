@@ -21,7 +21,18 @@ export function WeeklyResourceDock(props: { resources: ResourceSection[] }) {
   );
 
   return (
-    <Panel title="THIS WEEK" className="border-0 bg-transparent p-0 shadow-none">
+  <Panel
+  title="This week resources"
+  className="border-0 bg-transparent p-0 shadow-none"
+>
+      <div className="
+        relative inline-block
+        text-cyan-300
+        underline underline-offset-4 decoration-cyan-400/70
+        after:absolute after:left-0 after:-bottom-1 after:h-px after:w-full
+        after:bg-gradient-to-r after:from-cyan-400/0 after:via-cyan-400 after:to-violet-500/0
+        after:shadow-[0_0_12px_rgba(34,211,238,0.6)]
+      " />
       {links.length ? (
         <div className="space-y-1">
           {links.map((l) => (
