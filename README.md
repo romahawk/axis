@@ -1,105 +1,106 @@
 # Axis
 
-A lightweight personal control-plane app (Today + Week) with a React frontend and FastAPI backend.
+Personal execution control-plane app (single dashboard + review drawer).
 
 ## Repo structure
 
-```
+```text
 axis/
-  frontend/   # Vite + React + TypeScript + Tailwind (v3)
-  backend/    # FastAPI (Python) + venv
+  frontend/   # Vite + React + TypeScript + Tailwind
+  backend/    # FastAPI
   docs/
   shared/
 ```
 
 ## Prerequisites
 
-- **Node.js** (LTS recommended) + npm
-- **Python 3.10+** (3.11+ recommended)
-- Windows: Git Bash or PowerShell are both OK (commands below include Git Bash variants)
+- Node.js (LTS) + npm
+- Python 3.10+ (3.11 recommended)
 
----
+## Run locally
 
-## Run the app locally
+Run backend and frontend in two terminals.
 
-You will run **two processes** in **two terminals**:
+### 1) Backend (FastAPI)
 
-- Backend: http://localhost:8000
-- Frontend: http://localhost:5173
+From `backend/`:
 
-### 1) Start the backend (FastAPI)
-
-Open a terminal in `axis/backend`.
-
-#### Git Bash (recommended)
-```bash
-cd /d/WORK/IT_Projects/axis/backend
-python -m venv .venv
-source .venv/Scripts/activate
-
-python -m pip install --upgrade pip
-python -m pip install fastapi uvicorn
-
-uvicorn main:app --reload --port 8000
-```
-
-#### PowerShell
 ```powershell
-cd D:\WORK\IT_Projects\axis\backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
 python -m pip install --upgrade pip
-python -m pip install fastapi uvicorn
-
+python -m pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-✅ Quick backend checks:
-- http://localhost:8000/health
-- http://localhost:8000/api/v1/auth/me
-- http://localhost:8000/api/v1/views/today
-- http://localhost:8000/api/v1/views/week
+Quick checks:
 
----
+- `http://localhost:8000/health`
+- `http://localhost:8000/api/v1/auth/me`
+- `http://localhost:8000/api/v1/views/dashboard`
 
-### 2) Start the frontend (Vite)
+### 2) Frontend (Vite)
 
-Open a **second** terminal in `axis/frontend`.
+From `frontend/`:
 
 ```bash
-cd /d/WORK/IT_Projects/axis/frontend
 npm install
 npm run dev
 ```
 
 Open:
-- http://localhost:5173/today
-- http://localhost:5173/week
 
-You should see the header show your user (e.g., `RM · primary`) when the backend is running.
+- `http://localhost:5173`
 
----
+Note:
 
-## Common issues
+- Current app is a single dashboard shell (no `/today` or `/week` routes).
 
-### Frontend shows “API error”
-Backend is not running or not reachable on `http://localhost:8000`.
+## Environment variables
 
-- Confirm backend terminal shows: `Uvicorn running on http://127.0.0.1:8000`
-- Open http://localhost:8000/health
+Frontend uses `VITE_API_BASE_URL`:
 
-### VS Code shows Pylance “fastapi could not be resolved”
-Select the backend venv interpreter:
-- `D:\WORK\IT_Projects\axis\backend\.venv\Scripts\python.exe`
+- Dev default: `http://localhost:8000`
+- Production: must be set (for example in Vercel project settings)
 
-### Browser console: “Could not establish connection. Receiving end does not exist.”
-Usually caused by a browser extension. Confirm by trying Incognito (extensions off).
+Backend persistence:
 
----
+- Data directory defaults to `/data`
+- Can be overridden with `DATA_DIR`
 
-## Scripts (frontend)
+## Deployment notes
 
-- `npm run dev` — run dev server
-- `npm run build` — build production bundle
-- `npm run preview` — preview build
+- Frontend can be deployed on Vercel.
+- Backend is deployed on Fly (`backend-summer-dawn-9746`).
+- Vercel must point `VITE_API_BASE_URL` to the active backend URL.
+
+If production shows stale backend behavior, redeploy Fly backend:
+
+```bash
+cd backend
+flyctl deploy --remote-only
+```
+
+## Troubleshooting
+
+### Frontend shows `API error`
+
+- Confirm backend is running/reachable.
+- Verify frontend `VITE_API_BASE_URL` points to correct backend.
+
+### Console shows `Maximum update depth exceeded`
+
+- Ensure latest frontend commit is deployed (includes Projects Router loop fix).
+
+### Browser console noise like `Could not establish connection...`
+
+- Often extension/browser-injected script noise, not app runtime.
+
+## Backend tests
+
+From `backend/`:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
