@@ -5,6 +5,59 @@ import type { QueryClient } from "@tanstack/react-query";
 import { putJSON } from "../api/putJSON";
 import type { ResourceSection } from "../types";
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function validateAndNormalizeResources(
+  sections: ResourceSection[]
+): { ok: true; sections: ResourceSection[] } | { ok: false; error: string } {
+  const normalized: ResourceSection[] = [];
+
+  for (let i = 0; i < sections.length; i += 1) {
+    const section = sections[i];
+    const title = (section.title ?? "").trim();
+
+    if (!title) {
+      return { ok: false, error: `Section ${i + 1}: title is required.` };
+    }
+
+    const links = (section.links ?? [])
+      .map((link) => ({
+        label: (link.label ?? "").trim(),
+        url: (link.url ?? "").trim(),
+      }))
+      .filter((link) => link.label || link.url);
+
+    for (let j = 0; j < links.length; j += 1) {
+      const link = links[j];
+
+      if (!link.label || !link.url) {
+        return {
+          ok: false,
+          error: `Section ${i + 1}, link ${j + 1}: label and URL are required.`,
+        };
+      }
+
+      if (!isHttpUrl(link.url)) {
+        return {
+          ok: false,
+          error: `Section ${i + 1}, link ${j + 1}: URL must start with http:// or https://.`,
+        };
+      }
+    }
+
+    normalized.push({ title, links });
+  }
+
+  return { ok: true, sections: normalized };
+}
+
 export function useResourcesEditor(params: {
   serverResources: ResourceSection[];
   queryClient: QueryClient;
@@ -41,7 +94,13 @@ export function useResourcesEditor(params: {
     setSaveError(null);
 
     try {
-      await putJSON("/api/v1/resources", { sections: draft });
+      const validated = validateAndNormalizeResources(draft);
+      if (!validated.ok) {
+        setSaveError(validated.error);
+        return;
+      }
+
+      await putJSON("/api/v1/resources", { sections: validated.sections });
       setEditMode(false);
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     } catch (e) {

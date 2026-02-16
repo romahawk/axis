@@ -1,6 +1,6 @@
 // src/features/review/components/WeeklyReviewForm.tsx
 import { useEffect, useState } from "react";
-import { ClipboardCheck } from "lucide-react";
+import { AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useCreateWeeklyReview } from "../../../hooks/useJournal";
 import type { WeeklyOutcomeDraft } from "../types";
 
@@ -46,6 +46,7 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
   const [weeklyConstraint, setWeeklyConstraint] = useState("");
   const [weeklyDecision, setWeeklyDecision] = useState("");
   const [weeklyNextFocus, setWeeklyNextFocus] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const createWeekly = useCreateWeeklyReview();
 
@@ -84,7 +85,12 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
 
     const anyOutcome = payload.outcomes.some((o) => o.achieved || o.note);
     const anyText = Boolean(payload.constraint || payload.decision || payload.next_focus);
-    if (!anyOutcome && !anyText) return;
+    if (!anyOutcome && !anyText) {
+      setValidationError("Log at least one signal before saving weekly review.");
+      return;
+    }
+
+    setValidationError(null);
 
     await createWeekly.mutateAsync(payload);
 
@@ -139,6 +145,7 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
                     checked={o.achieved}
                     onChange={(e) => {
                       const checked = e.target.checked;
+                      setValidationError(null);
                       setWeeklyOutcomes((prev) => {
                         const next = [...prev];
                         next[idx] = { ...next[idx], achieved: checked };
@@ -155,6 +162,7 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
                 value={o.note}
                 onChange={(e) => {
                   const v = e.target.value;
+                  setValidationError(null);
                   setWeeklyOutcomes((prev) => {
                     const next = [...prev];
                     next[idx] = { ...next[idx], note: v };
@@ -171,7 +179,10 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
             <input
               className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
               value={weeklyConstraint}
-              onChange={(e) => setWeeklyConstraint(e.target.value)}
+              onChange={(e) => {
+                setValidationError(null);
+                setWeeklyConstraint(e.target.value);
+              }}
               placeholder="What limited execution most?"
             />
           </div>
@@ -181,7 +192,10 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
             <input
               className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
               value={weeklyDecision}
-              onChange={(e) => setWeeklyDecision(e.target.value)}
+              onChange={(e) => {
+                setValidationError(null);
+                setWeeklyDecision(e.target.value);
+              }}
               placeholder="What decision changes next week?"
             />
           </div>
@@ -191,10 +205,20 @@ export function WeeklyReviewForm({ onSuccess }: { onSuccess: () => void }) {
             <input
               className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-slate-600"
               value={weeklyNextFocus}
-              onChange={(e) => setWeeklyNextFocus(e.target.value)}
+              onChange={(e) => {
+                setValidationError(null);
+                setWeeklyNextFocus(e.target.value);
+              }}
               placeholder="Primary focus statement"
             />
           </div>
+
+          {validationError && (
+            <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-3 text-xs text-amber-200 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5" />
+              <div>{validationError}</div>
+            </div>
+          )}
 
           {createWeekly.isError && (
             <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-3 text-xs text-red-200">

@@ -64,6 +64,7 @@ export function ProjectsRouterPanel(props: {
   // Drag + drop ordering (HTML5 DnD)
   const [draggingKey, setDraggingKey] = React.useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = React.useState<string | null>(null);
+  const [reorderAnnouncement, setReorderAnnouncement] = React.useState("");
 
   React.useEffect(() => {
     const activeKeys = new Set(
@@ -118,11 +119,28 @@ export function ProjectsRouterPanel(props: {
     setDraggingKey(null);
   }
 
+  async function handleMoveProject(
+    project: Project,
+    direction: "up" | "down"
+  ) {
+    const offset = direction === "up" ? -1 : 1;
+    await moveProjectByOffset(project.key, offset);
+    setReorderAnnouncement(
+      `${displayProjectName(project)} moved ${direction} in ${
+        project.is_active ? "active" : "inactive"
+      } projects`
+    );
+  }
+
   return (
     <Panel
       title="Projects (router)"
       className="border-0 bg-transparent p-0 shadow-none"
     >
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {reorderAnnouncement}
+      </div>
+
       {/* Speed controls */}
       <div className="mb-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -230,7 +248,7 @@ export function ProjectsRouterPanel(props: {
                       <ChevronRight className="h-4 w-4 text-slate-500" />
                     )}
 
-                    <div className="truncate font-semibold text-slate-100">
+                    <div className="min-w-0 whitespace-normal break-words pr-1 text-sm font-semibold leading-5 text-slate-100">
                       {isEditing ? (
                         <input
                           autoFocus
@@ -272,26 +290,6 @@ export function ProjectsRouterPanel(props: {
                     </button>
 
                     <div className="flex gap-2">
-                      <button
-                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                        onClick={() => moveProjectByOffset(p.key, -1)}
-                        disabled={!canMoveUp || projectSaving}
-                        aria-label={`Move ${displayProjectName(p)} up`}
-                        title="Move up"
-                      >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
-
-                      <button
-                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                        onClick={() => moveProjectByOffset(p.key, 1)}
-                        disabled={!canMoveDown || projectSaving}
-                        aria-label={`Move ${displayProjectName(p)} down`}
-                        title="Move down"
-                      >
-                        <ChevronDownSmall className="h-3.5 w-3.5" />
-                      </button>
-
                       <button
                         className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                         onClick={() => startEditProject(p)}
@@ -337,6 +335,32 @@ export function ProjectsRouterPanel(props: {
                   </div>
                 )}
               </div>
+
+              {!isEditing ? (
+                <div className="px-3 pb-2">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void handleMoveProject(p, "up")}
+                      disabled={!canMoveUp || projectSaving}
+                      aria-label={`Move ${displayProjectName(p)} up`}
+                      title="Move up"
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void handleMoveProject(p, "down")}
+                      disabled={!canMoveDown || projectSaving}
+                      aria-label={`Move ${displayProjectName(p)} down`}
+                      title="Move down"
+                    >
+                      <ChevronDownSmall className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Expanded content */}
               {isExpanded ? (
