@@ -291,7 +291,9 @@ def normalize_week_state(doc: dict) -> dict:
     iso = date.today().isocalendar()
     default_week_id = f"{iso.year}-W{iso.week:02d}"
 
-    week_id = str(doc.get("week_id") or default_week_id)
+    # Always anchor the active week to the current ISO week.
+    # Stored week_id may be stale if the app wasn't explicitly "closed week" at rollover.
+    week_id = default_week_id
     mode = str(doc.get("mode") or "OFF")
 
     raw_outcomes = doc.get("outcomes", [])
@@ -810,7 +812,10 @@ def dashboard_view():
     global TODAY_STATE, WEEK_STATE
 
     TODAY_STATE = normalize_today_state(TODAY_STATE)
+    prev_week_id = WEEK_STATE.get("week_id")
     WEEK_STATE = normalize_week_state(WEEK_STATE)
+    if WEEK_STATE.get("week_id") != prev_week_id:
+        save_json(WEEK_STATE_PATH, WEEK_STATE)
 
     projects = PROJECTS.get("projects", [])
     active = [p for p in projects if p.get("is_active") is True][:3]
