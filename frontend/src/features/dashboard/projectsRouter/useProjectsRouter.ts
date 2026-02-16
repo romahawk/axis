@@ -215,6 +215,45 @@ export function useProjectsRouter(params: {
     }
   }
 
+  async function moveProjectByOffset(key: string, offset: -1 | 1) {
+    if (projectSaving) return;
+
+    const byKey = new Map(sortedProjects.map((p) => [p.key, p] as const));
+    const project = byKey.get(key);
+    if (!project) return;
+
+    const activeKeys = sortedProjects.filter((p) => p.is_active).map((p) => p.key);
+    const inactiveKeys = sortedProjects
+      .filter((p) => !p.is_active)
+      .map((p) => p.key);
+
+    const srcList = project.is_active ? activeKeys : inactiveKeys;
+    const fromIndex = srcList.indexOf(key);
+    if (fromIndex < 0) return;
+
+    const toIndex = fromIndex + offset;
+    if (toIndex < 0 || toIndex >= srcList.length) return;
+
+    const nextList = [...srcList];
+    const [moved] = nextList.splice(fromIndex, 1);
+    nextList.splice(toIndex, 0, moved);
+
+    const nextActiveKeys = project.is_active ? nextList : activeKeys;
+    const nextInactiveKeys = project.is_active ? inactiveKeys : nextList;
+    const nextOrderKeys = [...nextActiveKeys, ...nextInactiveKeys];
+
+    const currentByKey = new Map(projects.map((p) => [p.key, p] as const));
+    const nextProjects = nextOrderKeys
+      .map((k) => currentByKey.get(k))
+      .filter(Boolean) as Project[];
+
+    try {
+      await saveProjects(nextProjects);
+    } catch {
+      // error already set
+    }
+  }
+
   return {
     // derived
     activeCount,
@@ -240,5 +279,6 @@ export function useProjectsRouter(params: {
     addNewProject,
     deleteProject,
     reorderProjects,
+    moveProjectByOffset,
   };
 }

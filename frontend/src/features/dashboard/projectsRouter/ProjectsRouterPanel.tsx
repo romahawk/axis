@@ -8,6 +8,8 @@ import {
   ExternalLink,
   X,
   GripVertical,
+  ChevronUp,
+  ChevronDown as ChevronDownSmall,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
@@ -49,6 +51,7 @@ export function ProjectsRouterPanel(props: {
     addNewProject,
     deleteProject,
     reorderProjects,
+    moveProjectByOffset,
   } = useProjectsRouter({
     projects: props.projects ?? [],
     queryClient: qc,
@@ -172,6 +175,13 @@ export function ProjectsRouterPanel(props: {
           const isEditing = editingProjectKey === p.key;
           const isActive = !!p.is_active;
           const isExpanded = expanded.has(p.key);
+          const segmentKeys = isActive
+            ? sortedProjects.filter((sp) => sp.is_active).map((sp) => sp.key)
+            : sortedProjects.filter((sp) => !sp.is_active).map((sp) => sp.key);
+          const segmentIndex = segmentKeys.indexOf(p.key);
+          const canMoveUp = segmentIndex > 0;
+          const canMoveDown =
+            segmentIndex >= 0 && segmentIndex < segmentKeys.length - 1;
 
           return (
             <li
@@ -263,9 +273,30 @@ export function ProjectsRouterPanel(props: {
 
                     <div className="flex gap-2">
                       <button
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => moveProjectByOffset(p.key, -1)}
+                        disabled={!canMoveUp || projectSaving}
+                        aria-label={`Move ${displayProjectName(p)} up`}
+                        title="Move up"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => moveProjectByOffset(p.key, 1)}
+                        disabled={!canMoveDown || projectSaving}
+                        aria-label={`Move ${displayProjectName(p)} down`}
+                        title="Move down"
+                      >
+                        <ChevronDownSmall className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
                         className="inline-flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
                         onClick={() => startEditProject(p)}
                         disabled={projectSaving}
+                        aria-label={`Edit ${displayProjectName(p)}`}
                         title="Edit project"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -279,6 +310,7 @@ export function ProjectsRouterPanel(props: {
                           deleteProject(p.key);
                         }}
                         disabled={projectSaving}
+                        aria-label={`Delete ${displayProjectName(p)}`}
                         title="Delete project"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -376,6 +408,7 @@ export function ProjectsRouterPanel(props: {
                               })
                             }
                             type="button"
+                            aria-label="Remove link"
                             title="Remove link"
                           >
                             <X className="h-3.5 w-3.5" />
