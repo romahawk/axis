@@ -1,15 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-function apiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-  return (base ?? "").replace(/\/$/, "");
-}
-
-function toApiUrl(path: string) {
-  if (!path.startsWith("/")) path = `/${path}`;
-  const base = apiBase();
-  return base ? `${base}${path}` : path;
-}
+import { patchJSON } from "../lib/api";
 
 type ToggleArgs = {
   kind: "outcomes" | "actions"; // UI contract; we use "outcomes" for Top3
@@ -23,19 +13,10 @@ export function useToggleTodayItem() {
   return useMutation({
     mutationFn: async (args: ToggleArgs) => {
       // Canonical endpoint (v1)
-      const res = await fetch(toApiUrl(`/api/v1/today/top3/${args.id}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ done: args.done }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `Failed to toggle item ${args.id}`);
-      }
-
-      return res.json();
+      return patchJSON<{ id: string; text: string; done: boolean }>(
+        `/api/v1/today/top3/${args.id}`,
+        { done: args.done }
+      );
     },
 
     onSuccess: async () => {

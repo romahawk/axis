@@ -23,6 +23,20 @@ export async function postJSON<T>(pathOrUrl: string, body: unknown): Promise<T> 
   return res.json() as Promise<T>;
 }
 
+export async function putJSON<T>(pathOrUrl: string, body: unknown): Promise<T> {
+  const url = toApiUrl(pathOrUrl);
+
+  const res = await fetch(url, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`PUT ${url} -> HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
 export async function patchJSON<T>(pathOrUrl: string, body: unknown): Promise<T> {
   const url = toApiUrl(pathOrUrl);
 
