@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ClipboardCheck, X } from "lucide-react";
 
@@ -274,8 +274,17 @@ type Props = {
   onClose: () => void;
 };
 
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  const selector =
+    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
+    (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true"
+  );
+}
+
 export function ReviewDrawer({ open, onClose }: Props) {
   useLockBodyScroll(open);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const s = useReviewState(open);
   const journal = useJournalList({ limit: 50 });
@@ -297,6 +306,59 @@ export function ReviewDrawer({ open, onClose }: Props) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  // Keep keyboard focus inside the drawer while open.
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+
+      const panel = s.panelRef.current;
+      if (!panel) return;
+
+      const focusable = getFocusableElements(panel);
+      if (!focusable.length) {
+        e.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (e.shiftKey) {
+        if (!active || active === first || !panel.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (!active || active === last || !panel.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, s.panelRef]);
+
+  // Restore focus to the previously focused element when drawer closes.
+  useEffect(() => {
+    if (open) {
+      const active = document.activeElement;
+      returnFocusRef.current = active instanceof HTMLElement ? active : null;
+      return;
+    }
+
+    if (returnFocusRef.current) {
+      returnFocusRef.current.focus();
+      returnFocusRef.current = null;
+    }
+  }, [open]);
 
   const setTab = s.setTab;
 
