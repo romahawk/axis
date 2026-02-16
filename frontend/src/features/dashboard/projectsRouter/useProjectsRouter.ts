@@ -21,12 +21,21 @@ export function useProjectsRouter(params: {
     null
   );
 
-  const activeProjects = projects.filter((p) => p.is_active);
-  const inactiveProjects = projects.filter((p) => !p.is_active);
+  const activeProjects = React.useMemo(
+    () => projects.filter((p) => p.is_active),
+    [projects]
+  );
+  const inactiveProjects = React.useMemo(
+    () => projects.filter((p) => !p.is_active),
+    [projects]
+  );
   const activeCount = activeProjects.length;
 
   // Display order: actives first, then inactives, preserving relative order in each segment.
-  const sortedProjects = [...activeProjects, ...inactiveProjects];
+  const sortedProjects = React.useMemo(
+    () => [...activeProjects, ...inactiveProjects],
+    [activeProjects, inactiveProjects]
+  );
 
   function startEditProject(p: Project) {
     setProjectSaveError(null);

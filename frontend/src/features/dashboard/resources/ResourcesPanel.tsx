@@ -88,26 +88,32 @@ export function ResourcesPanel(props: { resources: ResourceSection[] }) {
 
           {/* Body */}
           {!editMode ? (
-            <div className="grid gap-3 md:grid-cols-3">
-              {resources.map((s) => (
-                <div key={s.title} className="rounded-lg border border-slate-900 p-3">
-                  <div className="text-sm font-semibold">{s.title}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {s.links.map((l) => (
-                      <a
-                        key={l.url + l.label}
-                        href={l.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
-                      >
-                        {l.label}
-                      </a>
-                    ))}
+            resources.length ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {resources.map((s) => (
+                  <div key={s.title} className="rounded-lg border border-slate-900 p-3">
+                    <div className="text-sm font-semibold">{s.title}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {s.links.map((l) => (
+                        <a
+                          key={l.url + l.label}
+                          href={l.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-white"
+                        >
+                          {l.label}
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-900 bg-slate-950/20 p-3 text-sm text-slate-400">
+                No resources yet. Open <span className="text-slate-200">Edit</span> to add your first section.
+              </div>
+            )
           ) : (
             <div className="space-y-4">
               {draft.map((s, sIdx) => (

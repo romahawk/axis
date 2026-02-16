@@ -66,7 +66,17 @@ export function ProjectsRouterPanel(props: {
     const activeKeys = new Set(
       sortedProjects.filter((p) => p.is_active).map((p) => p.key)
     );
-    setExpanded((prev) => new Set([...activeKeys, ...prev]));
+    setExpanded((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      activeKeys.forEach((key) => {
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
   }, [sortedProjects]);
 
   function toggleExpanded(key: string) {

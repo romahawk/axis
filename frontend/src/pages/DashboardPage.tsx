@@ -49,7 +49,7 @@ function getExecutionLink(project: Project): { url: string | null; kind: "exec" 
 }
 
 export default function DashboardPage() {
-  const { data, isLoading, isError, error } = useDashboardView();
+  const { data, isLoading, isError, error, refetch, isFetching } = useDashboardView();
   const toggleToday = useToggleTodayItem();
   const qc = useQueryClient();
 
@@ -68,7 +68,15 @@ export default function DashboardPage() {
   if (isError) {
     return (
       <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-200">
-        Failed to load dashboard: {String(error)}
+        <div>Failed to load dashboard: {String(error)}</div>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+          className="mt-3 rounded-md border border-red-800/60 bg-red-950/30 px-3 py-1.5 text-xs text-red-100 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isFetching ? "Retrying…" : "Retry"}
+        </button>
       </div>
     );
   }
@@ -101,13 +109,15 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="grid h-full grid-cols-1 gap-4"
-      style={{
-        gridTemplateColumns: leftCollapsed ? "72px 1fr 360px" : "320px 1fr 360px",
-      }}
+      className={[
+        "grid grid-cols-1 gap-4 xl:h-full",
+        leftCollapsed
+          ? "xl:grid-cols-[72px_minmax(0,1fr)_360px]"
+          : "xl:grid-cols-[320px_minmax(0,1fr)_360px]",
+      ].join(" ")}
     >
       {/* LEFT — Dock */}
-      <aside className="h-full overflow-y-auto pr-1">
+      <aside className="order-2 xl:order-1 xl:h-full xl:overflow-y-auto xl:pr-1">
         <div className="relative rounded-2xl border border-slate-800/60 bg-gradient-to-b from-slate-950/70 to-slate-950/40 p-3">
           <button
             type="button"
@@ -136,7 +146,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* CENTER */}
-      <main className="h-full overflow-y-auto pr-1">
+      <main className="order-1 xl:order-2 xl:h-full xl:overflow-y-auto xl:pr-1">
         <div className="space-y-4">
           <div>
             <div className="text-xs text-slate-400">THIS WEEK</div>
@@ -250,7 +260,7 @@ export default function DashboardPage() {
       </main>
 
       {/* RIGHT */}
-      <aside className="h-full overflow-y-auto pr-1">
+      <aside className="order-3 xl:h-full xl:overflow-y-auto xl:pr-1">
         <div className="space-y-4">
           <NowPanel />
           <InboxPanel onSendToToday={sendToToday} />
