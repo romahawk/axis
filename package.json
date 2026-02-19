@@ -1,0 +1,7 @@
+{
+  "name": "axis",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npm install && npx vite --host 0.0.0.0"
+  }
+}
