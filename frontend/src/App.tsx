@@ -4,12 +4,16 @@ import { BookOpen, Cpu, CircleDot, ClipboardCheck } from "lucide-react";
 
 import { useMe } from "./hooks/useMe";
 import DashboardPage from "./pages/DashboardPage";
+import ContextPage from "./pages/ContextPage";
 import { AxisGuideDrawer } from "./components/axis-guide/AxisGuideDrawer";
 import { ReviewDrawer } from "./components/review/ReviewDrawer";
+
+type ActiveView = "dashboard" | "context";
 
 export default function App() {
   const { data: me, isLoading, isError } = useMe();
 
+  const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [guideOpen, setGuideOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -57,6 +61,34 @@ export default function App() {
             </div>
           </div>
 
+          {/* Center: view toggle tabs */}
+          <nav className="flex items-center gap-1 rounded-lg border border-slate-800/50 bg-slate-950/40 p-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveView("dashboard")}
+              className={[
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                activeView === "dashboard"
+                  ? "bg-slate-800/60 text-slate-100 shadow-[0_0_0_1px_rgba(99,102,241,0.15)_inset]"
+                  : "text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("context")}
+              className={[
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                activeView === "context"
+                  ? "bg-slate-800/60 text-slate-100 shadow-[0_0_0_1px_rgba(245,158,11,0.15)_inset]"
+                  : "text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              Context
+            </button>
+          </nav>
+
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
@@ -94,7 +126,7 @@ export default function App() {
 
       <main className="w-full xl:h-[calc(100vh-56px)]">
         <div className="px-4 py-4 sm:px-6 xl:h-full">
-          <DashboardPage />
+          {activeView === "dashboard" ? <DashboardPage /> : <ContextPage />}
         </div>
       </main>
 
