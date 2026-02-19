@@ -45,7 +45,7 @@ export function NowPanel() {
   const calendarUrl = "https://calendar.google.com/calendar/u/0/r/agenda";
 
   return (
-    <Panel title="NOW">
+    <Panel className="axis-tone" title="NOW">
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm text-slate-200">
           <Clock className="h-4 w-4 text-slate-400" />

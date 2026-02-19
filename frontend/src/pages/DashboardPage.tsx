@@ -108,6 +108,17 @@ export default function DashboardPage() {
   }
 
   return (
+    <div className="space-y-4">
+      <div>
+        <div className="text-xs text-slate-400">DASHBOARD</div>
+        <div className="text-xl font-semibold text-slate-100">
+          Execution Control
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Weekly outcomes, daily focus, and operational dock.
+        </div>
+      </div>
+
     <div
       className={[
         "grid grid-cols-1 gap-4 xl:h-full",
@@ -118,7 +129,7 @@ export default function DashboardPage() {
     >
       {/* LEFT — Dock */}
       <aside className="order-2 xl:order-1 xl:h-full xl:overflow-y-auto xl:pr-1">
-        <div className="relative rounded-2xl border border-slate-800/60 bg-gradient-to-b from-slate-950/70 to-slate-950/40 p-3">
+        <div className="relative rounded-2xl border border-slate-800/60 axis-tone p-3">
           <button
             type="button"
             onClick={() => setLeftCollapsed(!leftCollapsed)}
@@ -150,7 +161,7 @@ export default function DashboardPage() {
         <div className="space-y-4">
           <div>
             <div className="text-xs text-slate-400">THIS WEEK</div>
-            <div className="text-xl font-semibold">{data.week.week_id}</div>
+            <div className="text-lg font-semibold text-slate-100">{data.week.week_id}</div>
           </div>
 
           <WeekOutcomesPanel weekOutcomes={weekOutcomes} putJSON={putJSON} />
@@ -158,11 +169,7 @@ export default function DashboardPage() {
 
           {/* ACTIVE PROJECTS (collapsible + distinct sci-fi tone) */}
           <Panel
-            className="
-              rounded-2xl border border-cyan-400/15
-              bg-[radial-gradient(1200px_600px_at_0%_0%,rgba(34,211,238,0.12),transparent_55%),linear-gradient(to_bottom,rgba(2,6,23,0.9),rgba(2,6,23,0.6))]
-              shadow-[0_0_0_1px_rgba(34,211,238,0.12)_inset,0_20px_60px_rgba(0,0,0,0.6)]
-            "
+            className="axis-tone axis-tone-week"
             title={null as any}
           >
             <button
@@ -266,6 +273,7 @@ export default function DashboardPage() {
           <InboxPanel onSendToToday={sendToToday} />
         </div>
       </aside>
+    </div>
     </div>
   );
 }

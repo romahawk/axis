@@ -71,7 +71,7 @@ export function InboxPanel(props: {
   }
 
   return (
-    <Panel title="Inbox">
+    <Panel className="axis-tone" title="Inbox">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-xs text-slate-500">
