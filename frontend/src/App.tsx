@@ -5,10 +5,11 @@ import { BookOpen, Cpu, CircleDot, ClipboardCheck } from "lucide-react";
 import { useMe } from "./hooks/useMe";
 import DashboardPage from "./pages/DashboardPage";
 import ContextPage from "./pages/ContextPage";
+import GanntifyPage from "./pages/GanntifyPage";
 import { AxisGuideDrawer } from "./components/axis-guide/AxisGuideDrawer";
 import { ReviewDrawer } from "./components/review/ReviewDrawer";
 
-type ActiveView = "dashboard" | "context";
+type ActiveView = "dashboard" | "context" | "ganntify";
 
 export default function App() {
   const { data: me, isLoading, isError } = useMe();
@@ -87,6 +88,18 @@ export default function App() {
             >
               Context
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("ganntify")}
+              className={[
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                activeView === "ganntify"
+                  ? "bg-slate-800/60 text-slate-100 shadow-[0_0_0_1px_rgba(20,184,166,0.15)_inset]"
+                  : "text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              Ganntify
+            </button>
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -126,7 +139,9 @@ export default function App() {
 
       <main className="w-full xl:h-[calc(100vh-56px)]">
         <div className="px-4 py-4 sm:px-6 xl:h-full">
-          {activeView === "dashboard" ? <DashboardPage /> : <ContextPage />}
+          {activeView === "dashboard" && <DashboardPage />}
+          {activeView === "context" && <ContextPage />}
+          {activeView === "ganntify" && <GanntifyPage />}
         </div>
       </main>
 
